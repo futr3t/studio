@@ -4,7 +4,7 @@ import { Toaster } from "@/components/ui/toaster";
 import AppProviders from '@/components/layout/app-providers';
 
 export const metadata: Metadata = {
-  title: 'Kitchinly',
+  title: 'ChefCheck',
   description: 'Your compliance and safety partner.',
 };
 

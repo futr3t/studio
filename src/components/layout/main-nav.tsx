@@ -32,7 +32,7 @@ export function MainNav() {
       <div className="container flex h-16 items-center justify-between">
         <Link href="/" className="flex items-center space-x-2 text-primary">
           <ShieldCheck className="h-8 w-8" />
-          <span className="font-bold text-xl font-headline">Kitchinly</span>
+          <span className="font-bold text-xl font-headline">ChefCheck</span>
         </Link>
         <nav className="flex items-center space-x-1">
           {navItems.map((item) => (
