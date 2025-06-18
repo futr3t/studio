@@ -2,8 +2,9 @@
 "use client";
 
 import React, { useMemo } from 'react';
+import Link from 'next/link';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { BarChart, CheckCircle2, AlertTriangle, ListChecks, Thermometer as ThermometerIcon, Sparkles, Truck, Factory } from "lucide-react";
+import { CheckCircle2, AlertTriangle, ListChecks, Thermometer as ThermometerIcon, Sparkles, Truck, Factory } from "lucide-react";
 import { MainNav } from "@/components/layout/main-nav";
 import {
   ChartContainer,
@@ -107,31 +108,35 @@ export default function DashboardPage() {
             </CardContent>
           </Card>
 
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Pending Cleaning Tasks</CardTitle>
-              <ListChecks className="h-5 w-5 text-blue-500" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{pendingCleaningTasks}</div>
-              <p className="text-xs text-muted-foreground">
-                Due based on schedule
-              </p>
-            </CardContent>
-          </Card>
+          <Link href="/cleaning" className="block hover:shadow-lg transition-shadow rounded-lg">
+            <Card className="h-full hover:cursor-pointer">
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Pending Cleaning Tasks</CardTitle>
+                <ListChecks className="h-5 w-5 text-blue-500" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">{pendingCleaningTasks}</div>
+                <p className="text-xs text-muted-foreground">
+                  Due based on schedule
+                </p>
+              </CardContent>
+            </Card>
+          </Link>
 
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Active Alerts</CardTitle>
-              <AlertTriangle className="h-5 w-5 text-red-500" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{activeAlertsCount}</div>
-              <p className="text-xs text-muted-foreground">
-                Non-compliant logs
-              </p>
-            </CardContent>
-          </Card>
+          <Link href="/reports" className="block hover:shadow-lg transition-shadow rounded-lg">
+            <Card className="h-full hover:cursor-pointer">
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Active Alerts</CardTitle>
+                <AlertTriangle className="h-5 w-5 text-red-500" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">{activeAlertsCount}</div>
+                <p className="text-xs text-muted-foreground">
+                  Non-compliant logs
+                </p>
+              </CardContent>
+            </Card>
+          </Link>
         </div>
 
         <div className="grid gap-6 lg:grid-cols-2">
@@ -173,13 +178,13 @@ export default function DashboardPage() {
                 <p className="text-sm text-muted-foreground">No recent activity.</p>
               )}
               {recentActivities.map((activity) => {
-                const ItemIcon = activity.itemIcon; // Correct: Directly use the component
-                const StatusIcon = activity.statusIcon; // Correct: Directly use the component
+                const ItemIcon = activity.itemIcon; 
+                const StatusIcon = activity.statusIcon; 
                 return (
                   <div key={activity.id} className={cn("flex items-center space-x-3 p-3 rounded-md", activity.isNonCompliant ? "bg-destructive/10" : "bg-card-foreground/5")}>
                     <ItemIcon className={cn("h-5 w-5", 
                       activity.logType === 'temperature' ? "text-blue-500" :
-                      activity.logType === 'production' ? "text-orange-500" : // Changed to Factory icon, color orange
+                      activity.logType === 'production' ? "text-orange-500" : 
                       activity.logType === 'cleaning' ? "text-purple-500" :
                       activity.logType === 'delivery' ? "text-indigo-500" : "text-gray-500"
                     )} />
