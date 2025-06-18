@@ -22,6 +22,7 @@ import {
   DialogDescription,
   DialogFooter,
 } from "@/components/ui/dialog";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useForm, Controller, SubmitHandler } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
@@ -31,13 +32,13 @@ import { useToast } from "@/hooks/use-toast";
 const temperatureLogSchema = z.object({
   temperature: z.coerce.number({ required_error: "Temperature is required", invalid_type_error: "Temperature must be a number" }),
   correctiveAction: z.string().optional(),
-  loggedBy: z.string().optional(),
+  loggedBy: z.string().optional(), // Stores User ID
 });
 
 type TemperatureLogFormData = z.infer<typeof temperatureLogSchema>;
 
 export default function TemperaturesPage() {
-  const { temperatureLogs, appliances, addTemperatureLog, updateTemperatureLog, deleteTemperatureLog: deleteLogFromContext } = useData();
+  const { temperatureLogs, appliances, users, findUserById, addTemperatureLog, updateTemperatureLog, deleteTemperatureLog: deleteLogFromContext } = useData();
   const { toast } = useToast();
 
   const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -116,6 +117,11 @@ export default function TemperaturesPage() {
   };
 
   const getApplianceName = (applianceId: string) => appliances.find(a => a.id === applianceId)?.name || 'Unknown Appliance';
+  const getUserName = (userId?: string) => {
+    if (!userId) return 'N/A';
+    const user = findUserById(userId);
+    return user ? user.name : userId; // Fallback for old string names if any
+  }
 
   return (
     <div className="flex flex-col min-h-screen">
@@ -200,7 +206,17 @@ export default function TemperaturesPage() {
                 render={({ field }) => (
                   <div>
                     <Label htmlFor="loggedByTemp">Logged By</Label>
-                    <Input id="loggedByTemp" {...field} placeholder="e.g., John Doe" />
+                    <Select onValueChange={field.onChange} value={field.value || ""}>
+                      <SelectTrigger id="loggedByTemp">
+                        <SelectValue placeholder="Select user" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="">N/A (No Logger)</SelectItem>
+                        {users.map(user => (
+                          <SelectItem key={user.id} value={user.id}>{user.name}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                   </div>
                 )}
               />
@@ -247,7 +263,7 @@ export default function TemperaturesPage() {
                       </Badge>
                     </TableCell>
                     <TableCell>{log.correctiveAction || "N/A"}</TableCell>
-                    <TableCell>{log.loggedBy || "N/A"}</TableCell>
+                    <TableCell>{getUserName(log.loggedBy)}</TableCell>
                     <TableCell className="text-right space-x-2">
                        <Button variant="ghost" size="icon" onClick={() => openEditDialog(log)}>
                         <Edit2 className="h-4 w-4" />
@@ -268,3 +284,6 @@ export default function TemperaturesPage() {
     </div>
   );
 }
+
+
+    

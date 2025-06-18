@@ -18,6 +18,7 @@ import { useData } from '@/context/DataContext';
 import type { ProductionLog, DeliveryLog, TemperatureLog, CleaningChecklistItem, Supplier, Appliance, User } from '@/lib/types';
 import jsPDF from 'jspdf';
 import 'jspdf-autotable';
+import { STATIC_NOW } from '@/lib/data'; // Import STATIC_NOW
 
 interface ReportData {
   reportTitle: string;
@@ -47,18 +48,18 @@ export default function ReportsPage() {
     cleaningChecklistItems,
     suppliers,
     appliances,
-    users, // Assuming users are available from context for resolving names
+    users, 
     findUserById 
   } = useData();
   const { toast } = useToast();
 
   const [generalReportDateRange, setGeneralReportDateRange] = useState<DateRange | undefined>({
-    from: subDays(new Date(), 29),
-    to: new Date(),
+    from: subDays(STATIC_NOW, 29), // Use STATIC_NOW
+    to: STATIC_NOW, // Use STATIC_NOW
   });
   const [nonCompliantReportDateRange, setNonCompliantReportDateRange] = useState<DateRange | undefined>({
-    from: subDays(new Date(), 29),
-    to: new Date(),
+    from: subDays(STATIC_NOW, 29), // Use STATIC_NOW
+    to: STATIC_NOW, // Use STATIC_NOW
   });
 
   const getSupplierName = (supplierId: string): string => suppliers.find(s => s.id === supplierId)?.name || supplierId;
@@ -66,7 +67,7 @@ export default function ReportsPage() {
   const getUserName = (userId?: string): string => {
     if (!userId) return 'N/A';
     const user = findUserById(userId);
-    return user ? user.name : userId;
+    return user ? user.name : userId; // Fallback for old string names if any
   }
 
   const handleGenerateGeneralReport = () => {
@@ -101,7 +102,7 @@ export default function ReportsPage() {
       log.items.map(item => `${item.name} (Qty: ${item.quantity} ${item.unit}, Temp: ${item.temperature ?? 'N/A'}°C, ${item.isCompliant ? 'OK' : 'Not OK'})`).join('; '),
       log.isCompliant ? "Compliant" : "Non-Compliant",
       log.correctiveAction || "N/A",
-      log.receivedBy || "N/A", // Assuming receivedBy might be a name string for now
+      getUserName(log.receivedBy), // Updated to use getUserName
       log.vehicleReg || "N/A",
     ]);
     
@@ -174,7 +175,7 @@ export default function ReportsPage() {
       yPos += 10;
 
       reportData.sections.forEach(section => {
-        if (yPos > 260 && section.data.length > 0) { // Add new page only if there's content and yPos is low
+        if (yPos > 260 && section.data.length > 0) { 
           doc.addPage();
           yPos = 15;
         }
@@ -189,23 +190,20 @@ export default function ReportsPage() {
             body: section.data,
             startY: tableStartY,
             theme: 'striped',
-            headStyles: { fillColor: [59, 130, 246] }, // Tailwind primary blue
+            headStyles: { fillColor: [59, 130, 246] }, 
             margin: { top: 10 },
-            // didDrawPage is useful if you need to do something on each page the table spans
-            // but for final yPos, doc.lastAutoTable.finalY is more direct.
           });
           if (doc.lastAutoTable && typeof doc.lastAutoTable.finalY === 'number') {
-            yPos = doc.lastAutoTable.finalY + 10; // Space after table
+            yPos = doc.lastAutoTable.finalY + 10; 
           } else {
-            // Fallback if lastAutoTable or finalY is not available
-            yPos = tableStartY + 20 + (section.data.length * 5); // Rough estimate
+            yPos = tableStartY + 20 + (section.data.length * 5); 
           }
         } else {
           doc.setFontSize(10);
           doc.text(section.emptyMessage, 14, yPos);
-          yPos += 7; // Space after text for empty message
+          yPos += 7; 
         }
-        yPos += 5; // Add some space before the next section header
+        yPos += 5; 
       });
       
       const fileName = `General_Compliance_Report_${format(new Date(), "yyyy-MM-dd", { locale: enUS })}.pdf`;
@@ -235,7 +233,7 @@ export default function ReportsPage() {
       });
       return;
     }
-    // Placeholder for non-compliant report generation logic
+    
     console.log("Generating Non-Compliant Logs Report for:", nonCompliantReportDateRange);
     toast({
       title: "Non-Compliant Logs Report Generation (Placeholder)",
@@ -363,3 +361,6 @@ export default function ReportsPage() {
     </div>
   );
 }
+
+
+    

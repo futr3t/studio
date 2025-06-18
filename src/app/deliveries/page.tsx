@@ -45,15 +45,15 @@ const deliveryLogSchema = z.object({
   driverName: z.string().optional(),
   overallCondition: z.enum(['good', 'fair', 'poor']).optional(),
   items: z.array(deliveryItemSchema).min(1, "At least one item is required"),
-  isCompliant: z.boolean().default(true), // Overall compliance
+  isCompliant: z.boolean().default(true), 
   correctiveAction: z.string().optional(),
-  receivedBy: z.string().optional(),
+  receivedBy: z.string().optional(), // Stores User ID
 });
 
 type DeliveryLogFormData = z.infer<typeof deliveryLogSchema>;
 
 export default function DeliveriesPage() {
-  const { deliveryLogs, suppliers, addDeliveryLog, updateDeliveryLog, deleteDeliveryLog: deleteLogFromContext } = useData();
+  const { deliveryLogs, suppliers, users, findUserById, addDeliveryLog, updateDeliveryLog, deleteDeliveryLog: deleteLogFromContext } = useData();
   const { toast } = useToast();
   
   const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -64,7 +64,8 @@ export default function DeliveriesPage() {
     defaultValues: {
       supplierId: "",
       items: [{ name: "", quantity: 1, unit: "pcs", isCompliant: true }],
-      isCompliant: true, // Default overall compliance
+      isCompliant: true,
+      receivedBy: "", 
     },
   });
 
@@ -130,6 +131,11 @@ export default function DeliveriesPage() {
   };
   
   const getSupplierName = (supplierId: string) => suppliers.find(s => s.id === supplierId)?.name || 'Unknown Supplier';
+  const getUserName = (userId?: string) => {
+    if (!userId) return 'N/A';
+    const user = findUserById(userId);
+    return user ? user.name : userId; // Fallback for old string names if any
+  }
 
   return (
     <div className="flex flex-col min-h-screen">
@@ -216,7 +222,27 @@ export default function DeliveriesPage() {
 
               <Controller name="isCompliant" control={control} render={({ field }) => (<div className="flex items-center space-x-2"><Checkbox checked={field.value} onCheckedChange={field.onChange} id="overallCompliantDel" /><Label htmlFor="overallCompliantDel">Overall Delivery Compliant?</Label></div>)} />
               <Controller name="correctiveAction" control={control} render={({ field }) => (<div><Label>Corrective Action (if not compliant)</Label><Textarea {...field} disabled={overallIsCompliant}/></div>)} />
-              <Controller name="receivedBy" control={control} render={({ field }) => (<div><Label>Received By</Label><Input {...field} /></div>)} />
+              
+              <Controller
+                name="receivedBy"
+                control={control}
+                render={({ field }) => (
+                  <div>
+                    <Label htmlFor="receivedByDel">Received By</Label>
+                    <Select onValueChange={field.onChange} value={field.value || ""}>
+                      <SelectTrigger id="receivedByDel">
+                        <SelectValue placeholder="Select user" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="">N/A (No Verifier)</SelectItem>
+                        {users.map(user => (
+                          <SelectItem key={user.id} value={user.id}>{user.name}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
+              />
 
               <DialogFooter>
                 <Button type="button" variant="outline" onClick={() => setIsDialogOpen(false)}>Cancel</Button>
@@ -259,7 +285,7 @@ export default function DeliveriesPage() {
                         {log.isCompliant ? "Compliant" : "Non-Compliant"}
                       </Badge>
                     </TableCell>
-                    <TableCell>{log.receivedBy || "N/A"}</TableCell>
+                    <TableCell>{getUserName(log.receivedBy)}</TableCell>
                     <TableCell className="text-right space-x-2">
                       <Button variant="ghost" size="icon" onClick={() => openDialogForEdit(log)}><Edit2 className="h-4 w-4" /><span className="sr-only">Edit</span></Button>
                       <Button variant="ghost" size="icon" onClick={() => handleDelete(log.id)} className="text-destructive hover:text-destructive/80"><Trash2 className="h-4 w-4" /><span className="sr-only">Delete</span></Button>
@@ -274,3 +300,6 @@ export default function DeliveriesPage() {
     </div>
   );
 }
+
+
+    

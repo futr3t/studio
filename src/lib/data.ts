@@ -1,9 +1,9 @@
 
 import type { Supplier, Appliance, ProductionLog, DeliveryLog, TemperatureLog, CleaningTask, CleaningChecklistItem, User, TrainingRecord } from './types';
-import { formatISO, addYears, subHours, subMinutes, subDays } from 'date-fns';
+import { formatISO, addYears, subHours, subMinutes, subDays, subYears } from 'date-fns';
 
 // Define some static base dates for consistency
-const STATIC_NOW = new Date(2024, 5, 18, 14, 30, 0); // June 18, 2024, 14:30:00
+export const STATIC_NOW = new Date(2024, 5, 18, 14, 30, 0); // June 18, 2024, 14:30:00 (Month is 0-indexed)
 
 export const mockSuppliersData: Supplier[] = [
   { id: 'sup1', name: 'Fresh Produce Co.', contactPerson: 'John Appleseed', phone: '555-1234', email: 'john@freshproduce.com' },
@@ -25,8 +25,8 @@ export const mockUsersData: User[] = [
     email: 'alice@chefcheck.com',
     role: 'admin',
     trainingRecords: [
-      { name: 'Food Safety Level 3', dateCompleted: formatISO(addYears(STATIC_NOW, -1), { representation: 'date' }), expiryDate: formatISO(addYears(STATIC_NOW, 2), { representation: 'date' }), certificateUrl: 'https://example.com/cert/alice1.pdf' },
-      { name: 'HACCP Principles', dateCompleted: formatISO(addYears(STATIC_NOW, -1), { representation: 'date' }) },
+      { name: 'Food Safety Level 3', dateCompleted: formatISO(subYears(STATIC_NOW, 1), { representation: 'date' }), expiryDate: formatISO(addYears(STATIC_NOW, 2), { representation: 'date' }), certificateUrl: 'https://example.com/cert/alice1.pdf' },
+      { name: 'HACCP Principles', dateCompleted: formatISO(subYears(STATIC_NOW, 1), { representation: 'date' }) },
     ],
   },
   {
@@ -35,7 +35,7 @@ export const mockUsersData: User[] = [
     email: 'bob@chefcheck.com',
     role: 'staff',
     trainingRecords: [
-      { name: 'Food Safety Level 2', dateCompleted: formatISO(new Date(2023, 5, 15), { representation: 'date' }), expiryDate: formatISO(new Date(2026, 5, 14), { representation: 'date' }) },
+      { name: 'Food Safety Level 2', dateCompleted: formatISO(subYears(new Date(2023, 4, 15),0), { representation: 'date' }), expiryDate: formatISO(addYears(new Date(2023, 4, 15),3), { representation: 'date' }) }, // May 15, 2023
     ],
   },
   {
@@ -53,7 +53,7 @@ export const mockProductionLogsData: ProductionLog[] = [
     id: 'prod1',
     productName: 'Chicken Curry',
     batchCode: 'CC20240728A',
-    logTime: formatISO(subMinutes(STATIC_NOW, 10)), // 10 mins ago from STATIC_NOW
+    logTime: formatISO(subMinutes(STATIC_NOW, 10)), 
     criticalLimitDetails: 'Cooked to 75°C core temperature',
     isCompliant: true,
     verifiedBy: 'user1',
@@ -62,7 +62,7 @@ export const mockProductionLogsData: ProductionLog[] = [
     id: 'prod2',
     productName: 'Beef Stew',
     batchCode: 'BS20240728B',
-    logTime: formatISO(subHours(STATIC_NOW, 2)), // 2 hours ago from STATIC_NOW
+    logTime: formatISO(subHours(STATIC_NOW, 2)), 
     criticalLimitDetails: 'Cooled from 60°C to 20°C within 2 hours',
     isCompliant: false,
     correctiveAction: 'Discarded batch. Reviewed cooling process.',
@@ -74,7 +74,7 @@ export const mockDeliveryLogsData: DeliveryLog[] = [
   {
     id: 'del1',
     supplierId: 'sup1',
-    deliveryTime: formatISO(subMinutes(STATIC_NOW, 30)), // 30 mins ago from STATIC_NOW
+    deliveryTime: formatISO(subMinutes(STATIC_NOW, 30)), 
     items: [
       { name: 'Tomatoes', quantity: 10, unit: 'kg', temperature: 4, isCompliant: true },
       { name: 'Lettuce', quantity: 5, unit: 'box', temperature: 3, isCompliant: true },
@@ -83,12 +83,12 @@ export const mockDeliveryLogsData: DeliveryLog[] = [
     driverName: 'Mike R.',
     overallCondition: 'good',
     isCompliant: true,
-    receivedBy: 'Store Manager Bob',
+    receivedBy: 'user2', 
   },
   {
     id: 'del2',
     supplierId: 'sup2',
-    deliveryTime: formatISO(subDays(STATIC_NOW, 1)), // Yesterday from STATIC_NOW
+    deliveryTime: formatISO(subDays(STATIC_NOW, 1)), 
     items: [
       { name: 'Minced Beef', quantity: 20, unit: 'kg', temperature: 6, isCompliant: false, notes: 'Temp slightly high' },
       { name: 'Chicken Breasts', quantity: 15, unit: 'kg', temperature: 2, isCompliant: true },
@@ -98,7 +98,7 @@ export const mockDeliveryLogsData: DeliveryLog[] = [
     overallCondition: 'fair',
     isCompliant: false,
     correctiveAction: 'Rejected minced beef. Informed supplier.',
-    receivedBy: 'Store Manager Bob',
+    receivedBy: 'user1', 
   },
 ];
 
@@ -107,7 +107,7 @@ export const mockTemperatureLogsData: TemperatureLog[] = [
     id: 'temp1',
     applianceId: 'app1',
     temperature: 3,
-    logTime: formatISO(subMinutes(STATIC_NOW, 5)), // 5 mins ago from STATIC_NOW
+    logTime: formatISO(subMinutes(STATIC_NOW, 5)), 
     isCompliant: true,
     loggedBy: 'user1',
   },
@@ -115,7 +115,7 @@ export const mockTemperatureLogsData: TemperatureLog[] = [
     id: 'temp2',
     applianceId: 'app2',
     temperature: -15,
-    logTime: formatISO(subHours(STATIC_NOW, 4)), // 4 hours ago from STATIC_NOW
+    logTime: formatISO(subHours(STATIC_NOW, 4)), 
     isCompliant: false,
     correctiveAction: 'Adjusted thermostat. Will re-check in 1 hour.',
     loggedBy: 'user2',
@@ -124,7 +124,7 @@ export const mockTemperatureLogsData: TemperatureLog[] = [
     id: 'temp3',
     applianceId: 'app1',
     temperature: 4,
-    logTime: formatISO(subHours(STATIC_NOW, 8)), // 8 hours ago from STATIC_NOW
+    logTime: formatISO(subHours(STATIC_NOW, 8)), 
     isCompliant: true,
     loggedBy: 'user1',
   },
@@ -145,7 +145,10 @@ export const mockCleaningChecklistItemsData: CleaningChecklistItem[] = mockClean
   frequency: task.frequency,
   description: task.description,
   completed: index % 2 === 0,
-  completedAt: index % 2 === 0 ? formatISO(subHours(STATIC_NOW, (index + 1) * 2)) : undefined, // Staggered times from STATIC_NOW
+  completedAt: index % 2 === 0 ? formatISO(subHours(STATIC_NOW, (index + 1) * 2)) : undefined, 
   completedBy: index % 2 === 0 ? 'user2' : undefined, 
   notes: index % 2 === 0 ? 'All good' : undefined,
 }));
+
+
+    
