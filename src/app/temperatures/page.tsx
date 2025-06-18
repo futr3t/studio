@@ -13,6 +13,7 @@ import { Badge } from "@/components/ui/badge";
 import { Thermometer, Edit2, Trash2, AlertCircle } from "lucide-react";
 import { Appliance, TemperatureLog } from "@/lib/types";
 import { format, parseISO } from 'date-fns';
+import { enUS } from 'date-fns/locale';
 import {
   Dialog,
   DialogContent,
@@ -239,7 +240,7 @@ export default function TemperaturesPage() {
                   <TableRow key={log.id} className={!log.isCompliant ? "bg-destructive/10" : ""}>
                     <TableCell className="font-medium">{getApplianceName(log.applianceId)}</TableCell>
                     <TableCell>{log.temperature.toFixed(1)}</TableCell>
-                    <TableCell>{format(parseISO(log.logTime), "PPpp")}</TableCell>
+                    <TableCell>{format(parseISO(log.logTime), "PPpp", { locale: enUS })}</TableCell>
                     <TableCell>
                       <Badge variant={log.isCompliant ? "default" : "destructive"} className={log.isCompliant ? "bg-accent text-accent-foreground hover:bg-accent/80" : ""}>
                         {log.isCompliant ? "Compliant" : "Non-Compliant"}

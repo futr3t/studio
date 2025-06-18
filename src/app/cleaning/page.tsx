@@ -11,6 +11,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import { CleaningChecklistItem, CleaningFrequency, User } from "@/lib/types";
 import { format, formatISO, parseISO } from 'date-fns';
+import { enUS } from 'date-fns/locale';
 import { Textarea } from '@/components/ui/textarea';
 import {
   Dialog,
@@ -56,7 +57,7 @@ export default function CleaningPage() {
     if (filterDate) {
        items = items.filter(item => {
         if (!item.completedAt) return filterStatus === 'pending'; // Only show pending if filtering by date and item not completed
-        return format(parseISO(item.completedAt), 'yyyy-MM-dd') === format(filterDate, 'yyyy-MM-dd');
+        return format(parseISO(item.completedAt), 'yyyy-MM-dd', { locale: enUS }) === format(filterDate, 'yyyy-MM-dd', { locale: enUS });
       });
     }
     return items;
@@ -152,7 +153,7 @@ export default function CleaningPage() {
                   <PopoverTrigger asChild>
                     <Button variant={"outline"} className={cn("w-full md:w-[200px] justify-start text-left font-normal",!filterDate && "text-muted-foreground")}>
                       <CalendarIcon className="mr-2 h-4 w-4" />
-                      {filterDate ? format(filterDate, "PPP") : <span>Filter by date</span>}
+                      {filterDate ? format(filterDate, "PPP", { locale: enUS }) : <span>Filter by date</span>}
                     </Button>
                   </PopoverTrigger>
                   <PopoverContent className="w-auto p-0"><Calendar mode="single" selected={filterDate} onSelect={setFilterDate} initialFocus /></PopoverContent>
@@ -196,7 +197,7 @@ export default function CleaningPage() {
                         <Badge variant="secondary">{getFrequencyLabel(item.frequency)}</Badge>
                       </TableCell>
                       <TableCell className={item.completed ? "text-muted-foreground" : ""}>
-                        {item.completedAt ? format(parseISO(item.completedAt), "PPpp") : "Pending"}
+                        {item.completedAt ? format(parseISO(item.completedAt), "PPpp", { locale: enUS }) : "Pending"}
                       </TableCell>
                       <TableCell className={item.completed ? "text-muted-foreground" : ""}>{completedByUser || (item.completedBy ? "Unknown User" : "N/A")}</TableCell>
                       <TableCell className={cn("text-xs", item.completed ? "text-muted-foreground" : "")}>{item.notes || "N/A"}</TableCell>

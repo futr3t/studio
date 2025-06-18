@@ -3,7 +3,7 @@
 
 import React, { useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { BarChart, CheckCircle2, AlertTriangle, ListChecks, ClipboardList, Thermometer, Sparkles, Truck } from "lucide-react";
+import { BarChart, CheckCircle2, AlertTriangle, ListChecks, ClipboardList, Thermometer as ThermometerIcon, Sparkles, Truck } from "lucide-react"; // Renamed Thermometer to ThermometerIcon
 import { MainNav } from "@/components/layout/main-nav";
 import {
   ChartContainer,
@@ -16,6 +16,7 @@ import { Bar, CartesianGrid, XAxis, YAxis, ResponsiveContainer, BarChart as Rech
 import type { ChartConfig } from "@/components/ui/chart";
 import { useData } from "@/context/DataContext";
 import { format, parseISO } from 'date-fns';
+import { enUS } from 'date-fns/locale';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 
@@ -189,7 +190,7 @@ export default function DashboardPage() {
                     <div className="flex-1">
                       <p className="text-sm font-medium">{activity.description}</p>
                       <p className="text-xs text-muted-foreground">
-                        {format(parseISO(activity.timestamp), "PPpp")}
+                        {format(parseISO(activity.timestamp), "PPpp", { locale: enUS })}
                         {activity.user && ` by ${activity.user}`}
                       </p>
                     </div>

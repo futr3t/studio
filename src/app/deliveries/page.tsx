@@ -15,6 +15,7 @@ import { PlusCircle, Edit2, Trash2, PackagePlus, X } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { DeliveryLog, DeliveryItem, Supplier } from "@/lib/types";
 import { format, parseISO } from 'date-fns';
+import { enUS } from 'date-fns/locale';
 import {
   Dialog,
   DialogContent,
@@ -250,7 +251,7 @@ export default function DeliveriesPage() {
                 )}
                 {deliveryLogs.map((log) => (
                   <TableRow key={log.id} className={!log.isCompliant ? "bg-destructive/10" : ""}>
-                    <TableCell>{format(parseISO(log.deliveryTime), "PPpp")}</TableCell>
+                    <TableCell>{format(parseISO(log.deliveryTime), "PPpp", { locale: enUS })}</TableCell>
                     <TableCell>{getSupplierName(log.supplierId)}</TableCell>
                     <TableCell>{log.items.length} item(s)</TableCell>
                     <TableCell>

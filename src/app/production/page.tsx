@@ -14,6 +14,7 @@ import { Badge } from "@/components/ui/badge";
 import { PlusCircle, Edit2, Trash2 } from "lucide-react";
 import { ProductionLog } from "@/lib/types";
 import { format, parseISO } from 'date-fns';
+import { enUS } from 'date-fns/locale';
 import {
   Dialog,
   DialogContent,
@@ -234,7 +235,7 @@ export default function ProductionPage() {
                   <TableRow key={log.id} className={!log.isCompliant ? "bg-destructive/10" : ""}>
                     <TableCell className="font-medium">{log.productName}</TableCell>
                     <TableCell>{log.batchCode}</TableCell>
-                    <TableCell>{format(parseISO(log.logTime), "PPpp")}</TableCell>
+                    <TableCell>{format(parseISO(log.logTime), "PPpp", { locale: enUS })}</TableCell>
                     <TableCell>{log.criticalLimitDetails}</TableCell>
                     <TableCell>
                       <Badge variant={log.isCompliant ? "default" : "destructive"} className={log.isCompliant ? "bg-accent text-accent-foreground hover:bg-accent/80" : ""}>

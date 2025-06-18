@@ -10,6 +10,7 @@ import { Calendar } from "@/components/ui/calendar";
 import { Label } from "@/components/ui/label";
 import { CalendarIcon, FileText } from "lucide-react";
 import { format, subDays } from 'date-fns';
+import { enUS } from 'date-fns/locale';
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 import { DateRange } from 'react-day-picker';
@@ -38,7 +39,7 @@ export default function ReportsPage() {
     console.log("Generating General Report for:", generalReportDateRange);
     toast({
       title: "General Report Generation Started",
-      description: `Report for ${format(generalReportDateRange.from, "PPP")} to ${format(generalReportDateRange.to, "PPP")} is being generated. (Placeholder)`,
+      description: `Report for ${format(generalReportDateRange.from, "PPP", { locale: enUS })} to ${format(generalReportDateRange.to, "PPP", { locale: enUS })} is being generated. (Placeholder)`,
       className: "bg-accent text-accent-foreground"
     });
     // Actual PDF generation logic would go here
@@ -56,7 +57,7 @@ export default function ReportsPage() {
     console.log("Generating Non-Compliant Logs Report for:", nonCompliantReportDateRange);
     toast({
       title: "Non-Compliant Logs Report Started",
-      description: `Report for ${format(nonCompliantReportDateRange.from, "PPP")} to ${format(nonCompliantReportDateRange.to, "PPP")} is being generated. (Placeholder)`,
+      description: `Report for ${format(nonCompliantReportDateRange.from, "PPP", { locale: enUS })} to ${format(nonCompliantReportDateRange.to, "PPP", { locale: enUS })} is being generated. (Placeholder)`,
       className: "bg-accent text-accent-foreground"
     });
     // Actual PDF generation logic and filtering would go here
@@ -93,11 +94,11 @@ export default function ReportsPage() {
                       {generalReportDateRange?.from ? (
                         generalReportDateRange.to ? (
                           <>
-                            {format(generalReportDateRange.from, "LLL dd, y")} -{" "}
-                            {format(generalReportDateRange.to, "LLL dd, y")}
+                            {format(generalReportDateRange.from, "LLL dd, y", { locale: enUS })} -{" "}
+                            {format(generalReportDateRange.to, "LLL dd, y", { locale: enUS })}
                           </>
                         ) : (
-                          format(generalReportDateRange.from, "LLL dd, y")
+                          format(generalReportDateRange.from, "LLL dd, y", { locale: enUS })
                         )
                       ) : (
                         <span>Pick a date range</span>
@@ -146,11 +147,11 @@ export default function ReportsPage() {
                       {nonCompliantReportDateRange?.from ? (
                         nonCompliantReportDateRange.to ? (
                           <>
-                            {format(nonCompliantReportDateRange.from, "LLL dd, y")} -{" "}
-                            {format(nonCompliantReportDateRange.to, "LLL dd, y")}
+                            {format(nonCompliantReportDateRange.from, "LLL dd, y", { locale: enUS })} -{" "}
+                            {format(nonCompliantReportDateRange.to, "LLL dd, y", { locale: enUS })}
                           </>
                         ) : (
-                          format(nonCompliantReportDateRange.from, "LLL dd, y")
+                          format(nonCompliantReportDateRange.from, "LLL dd, y", { locale: enUS })
                         )
                       ) : (
                         <span>Pick a date range</span>

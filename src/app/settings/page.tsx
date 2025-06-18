@@ -30,6 +30,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Separator } from '@/components/ui/separator';
 import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover';
 import { format, parse, isValid } from 'date-fns';
+import { enUS } from 'date-fns/locale';
 import { useData } from '@/context/DataContext';
 
 // Schemas for forms
@@ -299,8 +300,8 @@ export default function SettingsPage() {
                                     {user.trainingRecords.map((record, idx) => (
                                       <li key={idx}>
                                         <strong>{record.name}</strong>
-                                        <br />Completed: {record.dateCompleted ? format(parse(record.dateCompleted, 'yyyy-MM-dd', new Date()), 'PP') : 'N/A'}
-                                        {record.expiryDate && (<><br />Expires: {format(parse(record.expiryDate, 'yyyy-MM-dd', new Date()), 'PP')}</>)}
+                                        <br />Completed: {record.dateCompleted ? format(parse(record.dateCompleted, 'yyyy-MM-dd', new Date()), 'PP', { locale: enUS }) : 'N/A'}
+                                        {record.expiryDate && (<><br />Expires: {format(parse(record.expiryDate, 'yyyy-MM-dd', new Date()), 'PP', { locale: enUS })}</>)}
                                         {record.certificateUrl && (<><br /><a href={record.certificateUrl} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">View Certificate</a></>)}
                                       </li>))}
                                   </ul>
