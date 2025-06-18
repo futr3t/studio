@@ -24,6 +24,7 @@ import { useForm, Controller, SubmitHandler } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { Textarea } from '@/components/ui/textarea';
+import { Badge } from "@/components/ui/badge";
 
 
 // Schemas for forms
