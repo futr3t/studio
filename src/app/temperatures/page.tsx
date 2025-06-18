@@ -29,10 +29,12 @@ import * as z from "zod";
 import { useData } from '@/context/DataContext';
 import { useToast } from "@/hooks/use-toast";
 
+const NO_USER_VALUE = "__NONE__";
+
 const temperatureLogSchema = z.object({
   temperature: z.coerce.number({ required_error: "Temperature is required", invalid_type_error: "Temperature must be a number" }),
   correctiveAction: z.string().optional(),
-  loggedBy: z.string().optional(), // Stores User ID
+  loggedBy: z.string().optional(), // Stores User ID or NO_USER_VALUE
 });
 
 type TemperatureLogFormData = z.infer<typeof temperatureLogSchema>;
@@ -47,7 +49,7 @@ export default function TemperaturesPage() {
 
   const { control, handleSubmit, reset, watch, setValue } = useForm<TemperatureLogFormData>({
     resolver: zodResolver(temperatureLogSchema),
-    defaultValues: { temperature: undefined, correctiveAction: "", loggedBy: "" },
+    defaultValues: { temperature: undefined, correctiveAction: "", loggedBy: "" }, // Empty string for placeholder
   });
 
   const currentTemperature = watch("temperature");
@@ -89,20 +91,25 @@ export default function TemperaturesPage() {
         toast({title: "Error", description: "No appliance selected.", variant: "destructive"});
         return;
     }
+    
+    const submittedData = {
+        ...data,
+        loggedBy: data.loggedBy === NO_USER_VALUE ? undefined : data.loggedBy,
+    };
 
     if (editingLog) {
        updateTemperatureLog({ 
            ...editingLog, 
-           ...data, 
-           temperature: Number(data.temperature),
+           ...submittedData, 
+           temperature: Number(submittedData.temperature),
         }, selectedAppliance);
        toast({ title: "Log Updated", className: "bg-accent text-accent-foreground" });
     } else {
         addTemperatureLog({ 
             applianceId: selectedAppliance.id,
-            temperature: Number(data.temperature),
-            correctiveAction: data.correctiveAction,
-            loggedBy: data.loggedBy,
+            temperature: Number(submittedData.temperature),
+            correctiveAction: submittedData.correctiveAction,
+            loggedBy: submittedData.loggedBy,
         }, selectedAppliance);
        toast({ title: "Log Added", className: "bg-accent text-accent-foreground" });
     }
@@ -117,10 +124,11 @@ export default function TemperaturesPage() {
   };
 
   const getApplianceName = (applianceId: string) => appliances.find(a => a.id === applianceId)?.name || 'Unknown Appliance';
-  const getUserName = (userId?: string) => {
-    if (!userId) return 'N/A';
+  
+  const getUserNameForDisplay = (userId?: string) => {
+    if (!userId || userId === NO_USER_VALUE) return 'N/A';
     const user = findUserById(userId);
-    return user ? user.name : userId; // Fallback for old string names if any
+    return user ? user.name : 'Unknown User';
   }
 
   return (
@@ -211,7 +219,7 @@ export default function TemperaturesPage() {
                         <SelectValue placeholder="Select user" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="">N/A (No Logger)</SelectItem>
+                        <SelectItem value={NO_USER_VALUE}>N/A (No Logger)</SelectItem>
                         {users.map(user => (
                           <SelectItem key={user.id} value={user.id}>{user.name}</SelectItem>
                         ))}
@@ -263,7 +271,7 @@ export default function TemperaturesPage() {
                       </Badge>
                     </TableCell>
                     <TableCell>{log.correctiveAction || "N/A"}</TableCell>
-                    <TableCell>{getUserName(log.loggedBy)}</TableCell>
+                    <TableCell>{getUserNameForDisplay(log.loggedBy)}</TableCell>
                     <TableCell className="text-right space-x-2">
                        <Button variant="ghost" size="icon" onClick={() => openEditDialog(log)}>
                         <Edit2 className="h-4 w-4" />
@@ -284,6 +292,4 @@ export default function TemperaturesPage() {
     </div>
   );
 }
-
-
     

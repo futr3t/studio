@@ -30,6 +30,8 @@ import * as z from "zod";
 import { useData } from "@/context/DataContext";
 import { useToast } from "@/hooks/use-toast";
 
+const NO_USER_VALUE = "__NONE__";
+
 const deliveryItemSchema = z.object({
   name: z.string().min(1, "Item name is required"),
   quantity: z.coerce.number().min(0.1, "Quantity must be positive"),
@@ -47,7 +49,7 @@ const deliveryLogSchema = z.object({
   items: z.array(deliveryItemSchema).min(1, "At least one item is required"),
   isCompliant: z.boolean().default(true), 
   correctiveAction: z.string().optional(),
-  receivedBy: z.string().optional(), // Stores User ID
+  receivedBy: z.string().optional(), // Stores User ID or NO_USER_VALUE
 });
 
 type DeliveryLogFormData = z.infer<typeof deliveryLogSchema>;
@@ -65,7 +67,7 @@ export default function DeliveriesPage() {
       supplierId: "",
       items: [{ name: "", quantity: 1, unit: "pcs", isCompliant: true }],
       isCompliant: true,
-      receivedBy: "", 
+      receivedBy: "", // Empty string will show placeholder
     },
   });
 
@@ -92,7 +94,7 @@ export default function DeliveriesPage() {
       driverName: "",
       overallCondition: "good",
       correctiveAction: "",
-      receivedBy: "",
+      receivedBy: "", // Empty string for placeholder
     });
     setEditingLog(null);
     setIsDialogOpen(true);
@@ -114,11 +116,16 @@ export default function DeliveriesPage() {
   };
 
   const onSubmit: SubmitHandler<DeliveryLogFormData> = (data) => {
+    const submittedData = {
+      ...data,
+      receivedBy: data.receivedBy === NO_USER_VALUE ? undefined : data.receivedBy, // Store undefined if "N/A"
+    };
+
     if (editingLog) {
-      updateDeliveryLog({ ...editingLog, ...data });
+      updateDeliveryLog({ ...editingLog, ...submittedData });
       toast({ title: "Delivery Log Updated", className: "bg-accent text-accent-foreground" });
     } else {
-      addDeliveryLog(data);
+      addDeliveryLog(submittedData);
       toast({ title: "Delivery Log Added", className: "bg-accent text-accent-foreground" });
     }
     setIsDialogOpen(false);
@@ -131,10 +138,11 @@ export default function DeliveriesPage() {
   };
   
   const getSupplierName = (supplierId: string) => suppliers.find(s => s.id === supplierId)?.name || 'Unknown Supplier';
-  const getUserName = (userId?: string) => {
-    if (!userId) return 'N/A';
+  
+  const getUserNameForDisplay = (userId?: string) => {
+    if (!userId || userId === NO_USER_VALUE) return 'N/A';
     const user = findUserById(userId);
-    return user ? user.name : userId; // Fallback for old string names if any
+    return user ? user.name : 'Unknown User';
   }
 
   return (
@@ -234,7 +242,7 @@ export default function DeliveriesPage() {
                         <SelectValue placeholder="Select user" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="">N/A (No Verifier)</SelectItem>
+                        <SelectItem value={NO_USER_VALUE}>N/A (No Verifier)</SelectItem>
                         {users.map(user => (
                           <SelectItem key={user.id} value={user.id}>{user.name}</SelectItem>
                         ))}
@@ -285,7 +293,7 @@ export default function DeliveriesPage() {
                         {log.isCompliant ? "Compliant" : "Non-Compliant"}
                       </Badge>
                     </TableCell>
-                    <TableCell>{getUserName(log.receivedBy)}</TableCell>
+                    <TableCell>{getUserNameForDisplay(log.receivedBy)}</TableCell>
                     <TableCell className="text-right space-x-2">
                       <Button variant="ghost" size="icon" onClick={() => openDialogForEdit(log)}><Edit2 className="h-4 w-4" /><span className="sr-only">Edit</span></Button>
                       <Button variant="ghost" size="icon" onClick={() => handleDelete(log.id)} className="text-destructive hover:text-destructive/80"><Trash2 className="h-4 w-4" /><span className="sr-only">Delete</span></Button>
@@ -300,6 +308,4 @@ export default function DeliveriesPage() {
     </div>
   );
 }
-
-
     

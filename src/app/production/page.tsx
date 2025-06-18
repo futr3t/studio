@@ -30,13 +30,15 @@ import * as z from "zod";
 import { useData } from '@/context/DataContext';
 import { useToast } from "@/hooks/use-toast";
 
+const NO_USER_VALUE = "__NONE__";
+
 const productionLogSchema = z.object({
   productName: z.string().min(1, "Product name is required"),
   batchCode: z.string().min(1, "Batch code is required"),
   criticalLimitDetails: z.string().min(1, "Critical limit details are required"),
   isCompliant: z.boolean().default(true),
   correctiveAction: z.string().optional(),
-  verifiedBy: z.string().optional(), // Stores User ID
+  verifiedBy: z.string().optional(), // Stores User ID or NO_USER_VALUE
 });
 
 type ProductionLogFormData = z.infer<typeof productionLogSchema>;
@@ -56,7 +58,7 @@ export default function ProductionPage() {
       criticalLimitDetails: "",
       isCompliant: true,
       correctiveAction: "",
-      verifiedBy: "",
+      verifiedBy: "", // Empty string will show placeholder
     },
   });
 
@@ -77,7 +79,7 @@ export default function ProductionPage() {
       criticalLimitDetails: "",
       isCompliant: true,
       correctiveAction: "",
-      verifiedBy: "",
+      verifiedBy: "", // Empty string for placeholder
     });
     setEditingLog(null);
     setIsDialogOpen(true);
@@ -97,12 +99,16 @@ export default function ProductionPage() {
   };
 
   const onSubmit: SubmitHandler<ProductionLogFormData> = (data) => {
+     const submittedData = {
+      ...data,
+      verifiedBy: data.verifiedBy === NO_USER_VALUE ? undefined : data.verifiedBy,
+    };
     if (editingLog) {
-      updateProductionLog({ ...editingLog, ...data });
-      toast({ title: "Log Updated", description: `${data.productName} log has been updated.`, className: "bg-accent text-accent-foreground" });
+      updateProductionLog({ ...editingLog, ...submittedData });
+      toast({ title: "Log Updated", description: `${submittedData.productName} log has been updated.`, className: "bg-accent text-accent-foreground" });
     } else {
-      addProductionLog(data);
-      toast({ title: "Log Added", description: `${data.productName} log has been added.`, className: "bg-accent text-accent-foreground" });
+      addProductionLog(submittedData);
+      toast({ title: "Log Added", description: `${submittedData.productName} log has been added.`, className: "bg-accent text-accent-foreground" });
     }
     setIsDialogOpen(false);
     setEditingLog(null);
@@ -114,6 +120,12 @@ export default function ProductionPage() {
     if (logToDelete) {
       toast({ title: "Log Deleted", description: `${logToDelete.productName} log has been removed.`, variant: "destructive" });
     }
+  };
+
+  const getVerifierNameForDisplay = (userId?: string) => {
+    if (!userId || userId === NO_USER_VALUE) return 'N/A';
+    const user = findUserById(userId);
+    return user ? user.name : 'Unknown User';
   };
 
   return (
@@ -200,7 +212,7 @@ export default function ProductionPage() {
                         <SelectValue placeholder="Select user" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="">N/A (No Verifier)</SelectItem>
+                        <SelectItem value={NO_USER_VALUE}>N/A (No Verifier)</SelectItem>
                         {users.map(user => (
                           <SelectItem key={user.id} value={user.id}>{user.name}</SelectItem>
                         ))}
@@ -243,9 +255,7 @@ export default function ProductionPage() {
                   </TableRow>
                 )}
                 {productionLogs.map((log) => {
-                  const verifiedByUser = log.verifiedBy ? findUserById(log.verifiedBy) : null;
-                  const verifierName = verifiedByUser ? verifiedByUser.name : (log.verifiedBy ? log.verifiedBy : "N/A"); // Fallback for old data
-
+                  const verifierName = getVerifierNameForDisplay(log.verifiedBy);
                   return (
                     <TableRow key={log.id} className={!log.isCompliant ? "bg-destructive/10" : ""}>
                       <TableCell className="font-medium">{log.productName}</TableCell>
