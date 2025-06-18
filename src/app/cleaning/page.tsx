@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useState, useEffect } from 'react';
@@ -8,9 +9,9 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { CleaningChecklistItem, CleaningFrequency } from "@/lib/types";
-import { mockCleaningChecklist } from "@/lib/data";
-import { format, formatISO, isToday, isThisWeek, isThisMonth, parseISO } from 'date-fns';
+import { CleaningChecklistItem, CleaningFrequency, User } from "@/lib/types";
+import { mockCleaningChecklist, mockUsers } from "@/lib/data";
+import { format, formatISO, parseISO } from 'date-fns';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import {
@@ -23,7 +24,7 @@ import {
   DialogDescription
 } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
-import { CalendarIcon, Filter } from 'lucide-react';
+import { CalendarIcon } from 'lucide-react';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
 import { cn } from '@/lib/utils';
@@ -35,12 +36,15 @@ interface CompletionFormData {
   notes?: string;
 }
 
+// Assume the first user is the currently logged-in user for this example
+const currentUser: User | undefined = mockUsers[0];
+
 export default function CleaningPage() {
   const [checklist, setChecklist] = useState<CleaningChecklistItem[]>(mockCleaningChecklist);
   const [filteredChecklist, setFilteredChecklist] = useState<CleaningChecklistItem[]>(mockCleaningChecklist);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [currentItem, setCurrentItem] = useState<CleaningChecklistItem | null>(null);
-  const [completedBy, setCompletedBy] = useState('');
+  const [completedBy, setCompletedBy] = useState(currentUser?.name || '');
   const [completionNotes, setCompletionNotes] = useState('');
   const { toast } = useToast();
 
@@ -61,8 +65,7 @@ export default function CleaningPage() {
     }
     if (filterDate) {
        items = items.filter(item => {
-        if (!item.completedAt) return filterStatus === 'pending'; // Show pending if date is set and task not completed
-        // Check if completedAt matches the filterDate (ignoring time)
+        if (!item.completedAt) return filterStatus === 'pending'; 
         return format(parseISO(item.completedAt), 'yyyy-MM-dd') === format(filterDate, 'yyyy-MM-dd');
       });
     }
@@ -74,12 +77,12 @@ export default function CleaningPage() {
     const item = checklist.find(i => i.id === itemId);
     if (!item) return;
 
-    if (completed) { // If marking as complete, show dialog
+    if (completed) { 
       setCurrentItem(item);
-      setCompletedBy(item.completedBy || "");
+      setCompletedBy(currentUser?.name || item.completedBy || ""); // Pre-fill with current user or existing
       setCompletionNotes(item.notes || "");
       setIsDialogOpen(true);
-    } else { // If marking as incomplete
+    } else { 
       setChecklist(prev => prev.map(i => i.id === itemId ? { ...i, completed: false, completedAt: undefined, completedBy: undefined, notes: undefined } : i));
       toast({ title: "Task Incomplete", description: `${item.name} marked as pending.` });
     }
@@ -97,8 +100,8 @@ export default function CleaningPage() {
     toast({ title: "Task Completed!", description: `${currentItem.name} marked as complete.`, className: "bg-accent text-accent-foreground" });
     setIsDialogOpen(false);
     setCurrentItem(null);
-    setCompletedBy('');
-    setCompletionNotes('');
+    // Reset notes, completedBy will be pre-filled next time
+    setCompletionNotes(''); 
   };
   
   const getFrequencyLabel = (freq: CleaningFrequency) => {
@@ -232,7 +235,13 @@ export default function CleaningPage() {
                 <div className="space-y-4 py-4">
                     <div>
                         <Label htmlFor="completedBy">Completed By</Label>
-                        <Input id="completedBy" value={completedBy} onChange={(e) => setCompletedBy(e.target.value)} placeholder="Your name"/>
+                        <Input 
+                            id="completedBy" 
+                            value={completedBy} 
+                            onChange={(e) => setCompletedBy(e.target.value)} 
+                            placeholder="Your name"
+                            readOnly // Made read-only as it's pre-filled
+                        />
                     </div>
                     <div>
                         <Label htmlFor="completionNotes">Notes (Optional)</Label>
@@ -243,7 +252,6 @@ export default function CleaningPage() {
                     <Button variant="outline" onClick={() => {
                         setIsDialogOpen(false);
                         setCurrentItem(null);
-                         // Revert checkbox if dialog is cancelled without saving
                         if(currentItem) {
                            setChecklist(prev => prev.map(i => i.id === currentItem.id ? { ...i, completed: false } : i));
                         }
@@ -256,3 +264,5 @@ export default function CleaningPage() {
     </div>
   );
 }
+
+    
