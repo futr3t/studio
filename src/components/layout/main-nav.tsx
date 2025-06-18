@@ -37,7 +37,7 @@ export function MainNav() {
           <ShieldCheck className="h-8 w-8" />
           <span className="font-bold text-xl font-headline">ChefCheck</span>
         </Link>
-        <nav className="flex items-center space-x-1">
+        <nav className="flex items-center space-x-1 ml-6"> {/* Added ml-6 for spacing */}
           {navItems.map((item) => (
             <Button
               key={item.href}
