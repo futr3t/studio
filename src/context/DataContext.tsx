@@ -1,6 +1,6 @@
 
 "use client";
-import React, { createContext, useContext, useState, ReactNode, useMemo, useCallback } from 'react';
+import React, { createContext, useContext, useState, ReactNode, useCallback } from 'react';
 import { formatISO } from 'date-fns';
 import type {
   Supplier, Appliance, ProductionLog, DeliveryLog, TemperatureLog,
@@ -11,7 +11,7 @@ import {
   mockDeliveryLogsData, mockTemperatureLogsData, mockCleaningTasksData,
   mockCleaningChecklistItemsData, mockUsersData
 } from '@/lib/data';
-import { CheckCircle2, AlertTriangle, ClipboardList, Thermometer, Sparkles, Truck } from 'lucide-react';
+import { CheckCircle2, AlertTriangle, ClipboardList, Thermometer, Sparkles, Truck, Factory } from 'lucide-react';
 import { useToast } from "@/hooks/use-toast";
 
 interface DataContextType {
@@ -50,9 +50,7 @@ interface DataContextType {
   deleteCleaningTaskDefinition: (taskId: string) => void;
 
   updateCleaningChecklistItem: (updatedItem: CleaningChecklistItem) => void;
-  // Note: Adding/deleting CleaningChecklistItems might be more complex (e.g., based on daily generation)
-  // For now, only updates are handled explicitly through this function.
-
+  
   addUser: (userData: Omit<User, 'id'>) => void;
   updateUser: (updatedUser: User) => void;
   deleteUser: (userId: string) => void;
@@ -72,6 +70,10 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const [cleaningChecklistItems, setCleaningChecklistItems] = useState<CleaningChecklistItem[]>(mockCleaningChecklistItemsData);
   const [users, setUsers] = useState<User[]>(mockUsersData);
   const { toast } = useToast();
+
+  const findUserById = useCallback((userId: string): User | undefined => {
+    return users.find(u => u.id === userId);
+  }, [users]);
 
   const addSupplier = (supplierData: Omit<Supplier, 'id'>) => {
     const newSupplier = { ...supplierData, id: `sup${Date.now()}` };
@@ -155,8 +157,6 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const deleteCleaningTaskDefinition = (taskId: string) => {
     const name = cleaningTasks.find(t => t.id === taskId)?.name || 'Task Definition';
     setCleaningTasks(prev => prev.filter(t => t.id !== taskId));
-    // Also remove corresponding checklist items if any, or handle this dependency.
-    // For now, just removing definition. User should be warned this doesn't remove active checklist items.
     setCleaningChecklistItems(prev => prev.filter(item => item.taskId !== taskId));
     toast({ title: "Cleaning Task Definition Deleted", description: `${name} definition and related checklist items removed.`, variant: "destructive" });
   };
@@ -186,35 +186,32 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     toast({ title: "User Deleted", description: `${name} has been removed.`, variant: "destructive" });
   };
 
-  const findUserById = useCallback((userId: string) => {
-    return users.find(u => u.id === userId);
-  }, [users]);
-
-
   const getRecentActivities = useCallback((limit: number = 5): ActivityFeedItem[] => {
     const activities: ActivityFeedItem[] = [];
 
     productionLogs.forEach(log => {
+      const verifier = log.verifiedBy ? findUserById(log.verifiedBy) : null;
       activities.push({
         id: `prod-${log.id}`,
         logType: 'production',
         timestamp: log.logTime,
         description: `Production: ${log.productName} (Batch #${log.batchCode})`,
-        user: log.verifiedBy,
+        user: verifier ? verifier.name : (log.verifiedBy || undefined), // Fallback for old string names
         statusIcon: log.isCompliant ? CheckCircle2 : AlertTriangle,
-        itemIcon: ClipboardList,
+        itemIcon: Factory, // Changed from ClipboardList to Factory for Production
         isNonCompliant: !log.isCompliant
       });
     });
 
     temperatureLogs.forEach(log => {
       const appliance = appliances.find(a => a.id === log.applianceId);
+      const logger = log.loggedBy ? findUserById(log.loggedBy) : null;
       activities.push({
         id: `temp-${log.id}`,
         logType: 'temperature',
         timestamp: log.logTime,
         description: `Temperature: ${appliance?.name || 'Unknown'} (${log.temperature}°C)`,
-        user: log.loggedBy,
+        user: logger ? logger.name : (log.loggedBy || undefined),
         statusIcon: log.isCompliant ? CheckCircle2 : AlertTriangle,
         itemIcon: Thermometer,
         isNonCompliant: !log.isCompliant
@@ -222,13 +219,13 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     });
 
     cleaningChecklistItems.filter(task => task.completed && task.completedAt).forEach(task => {
-      const completingUser = users.find(u => u.id === task.completedBy)?.name;
+      const completingUser = task.completedBy ? findUserById(task.completedBy) : null;
       activities.push({
         id: `clean-${task.id}`,
         logType: 'cleaning',
         timestamp: task.completedAt!,
         description: `Cleaning: ${task.name} completed`,
-        user: completingUser || task.completedBy,
+        user: completingUser ? completingUser.name : (task.completedBy || undefined),
         statusIcon: CheckCircle2,
         itemIcon: Sparkles,
       });
@@ -236,12 +233,14 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     
     deliveryLogs.forEach(log => {
         const supplier = suppliers.find(s => s.id === log.supplierId);
+        // Assuming receivedBy could also be a user ID in future, or a name string
+        const receiverUser = log.receivedBy ? findUserById(log.receivedBy) : null; 
         activities.push({
             id: `del-${log.id}`,
             logType: 'delivery',
             timestamp: log.deliveryTime,
             description: `Delivery: From ${supplier?.name || 'Unknown'} (${log.items.length} items)`,
-            user: log.receivedBy,
+            user: receiverUser ? receiverUser.name : (log.receivedBy || undefined),
             statusIcon: log.isCompliant ? CheckCircle2 : AlertTriangle,
             itemIcon: Truck,
             isNonCompliant: !log.isCompliant
@@ -251,7 +250,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     return activities
       .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
       .slice(0, limit);
-  }, [productionLogs, temperatureLogs, cleaningChecklistItems, deliveryLogs, appliances, users, suppliers]);
+  }, [productionLogs, temperatureLogs, cleaningChecklistItems, deliveryLogs, appliances, users, suppliers, findUserById]);
 
 
   const value: DataContextType = {

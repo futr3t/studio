@@ -3,7 +3,7 @@
 
 import React, { useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { BarChart, CheckCircle2, AlertTriangle, ListChecks, ClipboardList, Thermometer as ThermometerIcon, Sparkles, Truck } from "lucide-react"; // Renamed Thermometer to ThermometerIcon
+import { BarChart, CheckCircle2, AlertTriangle, ListChecks, Thermometer as ThermometerIcon, Sparkles, Truck, Factory } from "lucide-react";
 import { MainNav } from "@/components/layout/main-nav";
 import {
   ChartContainer,
@@ -46,37 +46,34 @@ export default function DashboardPage() {
 
   const complianceData = useMemo(() => {
     const allLogs = [
-      ...productionLogs.map(l => ({ ...l, type: 'Production' })),
-      ...temperatureLogs.map(l => ({ ...l, type: 'Temperature' })),
-      ...deliveryLogs.map(l => ({ ...l, type: 'Delivery' })),
-      // Cleaning tasks are generally about completion, not boolean compliance in the same way.
-      // We can count completed vs pending for cleaning tasks.
+      ...productionLogs.map(l => ({ ...l, type: 'Production', time: l.logTime })),
+      ...temperatureLogs.map(l => ({ ...l, type: 'Temperature', time: l.logTime })),
+      ...deliveryLogs.map(l => ({ ...l, type: 'Delivery', time: l.deliveryTime })),
     ];
     
     const compliantCount = allLogs.filter(l => l.isCompliant).length;
     const totalCount = allLogs.length;
     const complianceRate = totalCount > 0 ? Math.round((compliantCount / totalCount) * 100) : 100;
 
-    // For chart data (monthly)
     const months = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
     const monthlyData: { month: string, compliant: number, nonCompliant: number }[] = months.map(m => ({ month: m, compliant: 0, nonCompliant: 0 }));
 
     allLogs.forEach(log => {
-      const monthIndex = parseISO(log.logTime || log.deliveryTime).getMonth();
+      const monthIndex = parseISO(log.time).getMonth(); // Use the common 'time' field
       if (log.isCompliant) {
         monthlyData[monthIndex].compliant++;
       } else {
         monthlyData[monthIndex].nonCompliant++;
       }
     });
-    // Filter to only months with data or recent past months for display if needed
+    
     const currentMonth = new Date().getMonth();
     const displayMonths = monthlyData.slice(Math.max(0, currentMonth - 5), currentMonth + 1);
 
 
     return {
       rate: complianceRate,
-      chartData: displayMonths.length > 1 ? displayMonths : monthlyData.slice(0,6) // Fallback to first 6 months if not enough recent data
+      chartData: displayMonths.length > 1 ? displayMonths : monthlyData.slice(0,6) 
     };
   }, [productionLogs, temperatureLogs, deliveryLogs]);
 
@@ -107,7 +104,6 @@ export default function DashboardPage() {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">{complianceData.rate}%</div>
-              {/* <p className="text-xs text-muted-foreground">Dynamic change from last month</p> */}
             </CardContent>
           </Card>
 
@@ -177,13 +173,13 @@ export default function DashboardPage() {
                 <p className="text-sm text-muted-foreground">No recent activity.</p>
               )}
               {recentActivities.map((activity) => {
-                const ItemIcon = activity.itemIcon;
-                const StatusIcon = activity.statusIcon;
+                const ItemIcon = activity.itemIcon; // Correct: Directly use the component
+                const StatusIcon = activity.statusIcon; // Correct: Directly use the component
                 return (
                   <div key={activity.id} className={cn("flex items-center space-x-3 p-3 rounded-md", activity.isNonCompliant ? "bg-destructive/10" : "bg-card-foreground/5")}>
                     <ItemIcon className={cn("h-5 w-5", 
                       activity.logType === 'temperature' ? "text-blue-500" :
-                      activity.logType === 'production' ? "text-orange-500" :
+                      activity.logType === 'production' ? "text-orange-500" : // Changed to Factory icon, color orange
                       activity.logType === 'cleaning' ? "text-purple-500" :
                       activity.logType === 'delivery' ? "text-indigo-500" : "text-gray-500"
                     )} />

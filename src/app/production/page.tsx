@@ -23,6 +23,7 @@ import {
   DialogDescription,
   DialogFooter,
 } from "@/components/ui/dialog";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useForm, Controller, SubmitHandler } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
@@ -35,13 +36,13 @@ const productionLogSchema = z.object({
   criticalLimitDetails: z.string().min(1, "Critical limit details are required"),
   isCompliant: z.boolean().default(true),
   correctiveAction: z.string().optional(),
-  verifiedBy: z.string().optional(),
+  verifiedBy: z.string().optional(), // Stores User ID
 });
 
 type ProductionLogFormData = z.infer<typeof productionLogSchema>;
 
 export default function ProductionPage() {
-  const { productionLogs, addProductionLog, updateProductionLog, deleteProductionLog: deleteLogFromContext } = useData();
+  const { productionLogs, addProductionLog, updateProductionLog, deleteProductionLog: deleteLogFromContext, users, findUserById } = useData();
   const { toast } = useToast();
   
   const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -194,7 +195,17 @@ export default function ProductionPage() {
                 render={({ field }) => (
                   <div>
                     <Label htmlFor="verifiedBy">Verified By</Label>
-                    <Input id="verifiedBy" {...field} placeholder="e.g., Chef John Doe" />
+                    <Select onValueChange={field.onChange} value={field.value || ""}>
+                      <SelectTrigger id="verifiedBy">
+                        <SelectValue placeholder="Select user" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="">N/A (No Verifier)</SelectItem>
+                        {users.map(user => (
+                          <SelectItem key={user.id} value={user.id}>{user.name}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                   </div>
                 )}
               />
@@ -231,31 +242,36 @@ export default function ProductionPage() {
                     <TableCell colSpan={8} className="text-center">No production logs yet.</TableCell>
                   </TableRow>
                 )}
-                {productionLogs.map((log) => (
-                  <TableRow key={log.id} className={!log.isCompliant ? "bg-destructive/10" : ""}>
-                    <TableCell className="font-medium">{log.productName}</TableCell>
-                    <TableCell>{log.batchCode}</TableCell>
-                    <TableCell>{format(parseISO(log.logTime), "PPpp", { locale: enUS })}</TableCell>
-                    <TableCell>{log.criticalLimitDetails}</TableCell>
-                    <TableCell>
-                      <Badge variant={log.isCompliant ? "default" : "destructive"} className={log.isCompliant ? "bg-accent text-accent-foreground hover:bg-accent/80" : ""}>
-                        {log.isCompliant ? "Compliant" : "Non-Compliant"}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>{log.correctiveAction || "N/A"}</TableCell>
-                    <TableCell>{log.verifiedBy || "N/A"}</TableCell>
-                    <TableCell className="text-right space-x-2">
-                      <Button variant="ghost" size="icon" onClick={() => openDialogForEdit(log)}>
-                        <Edit2 className="h-4 w-4" />
-                        <span className="sr-only">Edit Log</span>
-                      </Button>
-                      <Button variant="ghost" size="icon" onClick={() => handleDelete(log.id)} className="text-destructive hover:text-destructive/80">
-                        <Trash2 className="h-4 w-4" />
-                        <span className="sr-only">Delete Log</span>
-                      </Button>
-                    </TableCell>
-                  </TableRow>
-                ))}
+                {productionLogs.map((log) => {
+                  const verifiedByUser = log.verifiedBy ? findUserById(log.verifiedBy) : null;
+                  const verifierName = verifiedByUser ? verifiedByUser.name : (log.verifiedBy ? log.verifiedBy : "N/A"); // Fallback for old data
+
+                  return (
+                    <TableRow key={log.id} className={!log.isCompliant ? "bg-destructive/10" : ""}>
+                      <TableCell className="font-medium">{log.productName}</TableCell>
+                      <TableCell>{log.batchCode}</TableCell>
+                      <TableCell>{format(parseISO(log.logTime), "PPpp", { locale: enUS })}</TableCell>
+                      <TableCell>{log.criticalLimitDetails}</TableCell>
+                      <TableCell>
+                        <Badge variant={log.isCompliant ? "default" : "destructive"} className={log.isCompliant ? "bg-accent text-accent-foreground hover:bg-accent/80" : ""}>
+                          {log.isCompliant ? "Compliant" : "Non-Compliant"}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>{log.correctiveAction || "N/A"}</TableCell>
+                      <TableCell>{verifierName}</TableCell>
+                      <TableCell className="text-right space-x-2">
+                        <Button variant="ghost" size="icon" onClick={() => openDialogForEdit(log)}>
+                          <Edit2 className="h-4 w-4" />
+                          <span className="sr-only">Edit Log</span>
+                        </Button>
+                        <Button variant="ghost" size="icon" onClick={() => handleDelete(log.id)} className="text-destructive hover:text-destructive/80">
+                          <Trash2 className="h-4 w-4" />
+                          <span className="sr-only">Delete Log</span>
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
               </TableBody>
             </Table>
           </CardContent>
@@ -264,3 +280,4 @@ export default function ProductionPage() {
     </div>
   );
 }
+
