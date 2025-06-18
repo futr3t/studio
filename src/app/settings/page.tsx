@@ -9,9 +9,9 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { PlusCircle, Edit2, Trash2, ListFilter, Building, Thermometer, SparklesIcon, Save } from "lucide-react";
-import { Supplier, Appliance, CleaningTask, CleaningFrequency } from "@/lib/types";
-import { mockSuppliers, mockAppliances, mockCleaningTasks } from "@/lib/data";
+import { PlusCircle, Edit2, Trash2, ListFilter, Building, Thermometer, SparklesIcon, Save, Users } from "lucide-react";
+import { Supplier, Appliance, CleaningTask, CleaningFrequency, User, TrainingRecord } from "@/lib/types";
+import { mockSuppliers, mockAppliances, mockCleaningTasks, mockUsers } from "@/lib/data";
 import {
   Dialog,
   DialogContent,
@@ -29,6 +29,8 @@ import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/hooks/use-toast";
 import { Separator } from '@/components/ui/separator';
+import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover';
+import { format, parse, isValid } from 'date-fns';
 
 // Schemas for forms
 const supplierSchema = z.object({
@@ -56,22 +58,32 @@ const cleaningTaskSchema = z.object({
 });
 type CleaningTaskFormData = z.infer<typeof cleaningTaskSchema>;
 
+const userSchema = z.object({
+  name: z.string().min(1, "User name is required"),
+  email: z.string().email("Invalid email address"),
+  role: z.enum(['admin', 'staff']),
+  trainingRecords: z.string().optional(), // Raw string from textarea
+});
+type UserFormData = z.infer<typeof userSchema>;
+
+
 export default function SettingsPage() {
   const [suppliers, setSuppliers] = useState<Supplier[]>(mockSuppliers);
   const [appliances, setAppliances] = useState<Appliance[]>(mockAppliances);
   const [cleaningTasks, setCleaningTasks] = useState<CleaningTask[]>(mockCleaningTasks);
+  const [users, setUsers] = useState<User[]>(mockUsers);
 
   const [dialogOpen, setDialogOpen] = useState(false);
-  const [currentForm, setCurrentForm] = useState<"supplier" | "appliance" | "cleaningTask" | null>(null);
+  const [currentForm, setCurrentForm] = useState<"supplier" | "appliance" | "cleaningTask" | "user" | null>(null);
   const [editingItem, setEditingItem] = useState<any | null>(null);
 
   const supplierForm = useForm<SupplierFormData>({ resolver: zodResolver(supplierSchema) });
   const applianceForm = useForm<ApplianceFormData>({ resolver: zodResolver(applianceSchema) });
   const cleaningTaskForm = useForm<CleaningTaskFormData>({ resolver: zodResolver(cleaningTaskSchema) });
+  const userForm = useForm<UserFormData>({ resolver: zodResolver(userSchema) });
   
   const { toast } = useToast();
 
-  // State for Parameters tab
   const [fridgeMinTemp, setFridgeMinTemp] = useState<string>("0");
   const [fridgeMaxTemp, setFridgeMaxTemp] = useState<string>("5");
   const [freezerMinTemp, setFreezerMinTemp] = useState<string>("-25");
@@ -81,13 +93,31 @@ export default function SettingsPage() {
   const [emailAlerts, setEmailAlerts] = useState<boolean>(true);
   const [smsAlerts, setSmsAlerts] = useState<boolean>(false);
 
+  const parseTrainingRecords = (recordsString?: string): TrainingRecord[] => {
+    if (!recordsString) return [];
+    return recordsString.split('\n').map(line => line.trim()).filter(line => line).map(line => {
+      const parts = line.split(';').map(part => part.trim());
+      const name = parts[0] || "Unnamed Record";
+      const dateCompleted = parts[1] || "";
+      const expiryDate = parts[2] || undefined;
+      const certificateUrl = parts[3] || undefined;
+      return { name, dateCompleted, expiryDate, certificateUrl };
+    }).filter(record => record.name && record.dateCompleted);
+  };
 
-  const openDialog = (formType: "supplier" | "appliance" | "cleaningTask", itemToEdit: any | null = null) => {
+  const formatTrainingRecordsForTextarea = (records?: TrainingRecord[]): string => {
+    if (!records) return "";
+    return records.map(r => `${r.name};${r.dateCompleted};${r.expiryDate || ''};${r.certificateUrl || ''}`).join('\n');
+  };
+
+
+  const openDialog = (formType: "supplier" | "appliance" | "cleaningTask" | "user", itemToEdit: any | null = null) => {
     setCurrentForm(formType);
     setEditingItem(itemToEdit);
     if (formType === "supplier") supplierForm.reset(itemToEdit || {name: "", contactPerson: "", phone: "", email: ""});
     if (formType === "appliance") applianceForm.reset(itemToEdit || {name: "", location: "", type: "", minTemp: undefined, maxTemp: undefined});
     if (formType === "cleaningTask") cleaningTaskForm.reset(itemToEdit || {name: "", area: "", frequency: "daily", description: ""});
+    if (formType === "user") userForm.reset(itemToEdit ? {...itemToEdit, trainingRecords: formatTrainingRecordsForTextarea(itemToEdit.trainingRecords)} : {name: "", email: "", role: "staff", trainingRecords: ""});
     setDialogOpen(true);
   };
 
@@ -95,7 +125,7 @@ export default function SettingsPage() {
     if (editingItem) {
       setSuppliers(suppliers.map(s => s.id === editingItem.id ? { ...s, ...data } : s));
     } else {
-      setSuppliers([...suppliers, { id: `sup${suppliers.length + 1}`, ...data }]);
+      setSuppliers([...suppliers, { id: `sup${Date.now()}`, ...data }]);
     }
     setDialogOpen(false);
     toast({ title: "Supplier Saved", description: `Supplier ${data.name} has been ${editingItem ? 'updated' : 'added'}.`, className: "bg-accent text-accent-foreground" });
@@ -105,7 +135,7 @@ export default function SettingsPage() {
     if (editingItem) {
       setAppliances(appliances.map(a => a.id === editingItem.id ? { ...a, ...data } : a));
     } else {
-      setAppliances([...appliances, { id: `app${appliances.length + 1}`, ...data }]);
+      setAppliances([...appliances, { id: `app${Date.now()}`, ...data }]);
     }
     setDialogOpen(false);
     toast({ title: "Appliance Saved", description: `Appliance ${data.name} has been ${editingItem ? 'updated' : 'added'}.`, className: "bg-accent text-accent-foreground" });
@@ -115,13 +145,26 @@ export default function SettingsPage() {
     if (editingItem) {
       setCleaningTasks(cleaningTasks.map(t => t.id === editingItem.id ? { ...t, ...data } : t));
     } else {
-      setCleaningTasks([...cleaningTasks, { id: `ct${cleaningTasks.length + 1}`, ...data }]);
+      setCleaningTasks([...cleaningTasks, { id: `ct${Date.now()}`, ...data }]);
     }
     setDialogOpen(false);
     toast({ title: "Cleaning Task Saved", description: `Task ${data.name} has been ${editingItem ? 'updated' : 'added'}.`, className: "bg-accent text-accent-foreground" });
   };
 
-  const deleteItem = (type: "supplier" | "appliance" | "cleaningTask", id: string) => {
+  const handleUserSubmit: SubmitHandler<UserFormData> = (data) => {
+    const parsedRecords = parseTrainingRecords(data.trainingRecords);
+    const userData = { ...data, trainingRecords: parsedRecords };
+
+    if (editingItem) {
+      setUsers(users.map(u => u.id === editingItem.id ? { ...editingItem, ...userData } : u));
+    } else {
+      setUsers([...users, { id: `user${Date.now()}`, ...userData }]);
+    }
+    setDialogOpen(false);
+    toast({ title: "User Saved", description: `User ${data.name} has been ${editingItem ? 'updated' : 'added'}.`, className: "bg-accent text-accent-foreground" });
+  };
+
+  const deleteItem = (type: "supplier" | "appliance" | "cleaningTask" | "user", id: string) => {
     let itemName = '';
     if (type === "supplier") {
         itemName = suppliers.find(s => s.id === id)?.name || 'Item';
@@ -135,7 +178,11 @@ export default function SettingsPage() {
         itemName = cleaningTasks.find(t => t.id === id)?.name || 'Item';
         setCleaningTasks(cleaningTasks.filter(t => t.id !== id));
     }
-    toast({ title: "Item Deleted", description: `${itemName} has been removed.`, variant: "destructive" });
+    if (type === "user") {
+        itemName = users.find(u => u.id === id)?.name || 'Item';
+        setUsers(users.filter(u => u.id !== id));
+    }
+    toast({ title: `${type.charAt(0).toUpperCase() + type.slice(1)} Deleted`, description: `${itemName} has been removed.`, variant: "destructive" });
   };
   
   const getFrequencyLabel = (freq: CleaningFrequency) => {
@@ -146,7 +193,6 @@ export default function SettingsPage() {
   }
   
   const handleSaveParameters = () => {
-    // In a real app, you would save these to a backend/localStorage
     console.log("Parameters saved:", {
       fridgeMinTemp, fridgeMaxTemp,
       freezerMinTemp, freezerMaxTemp,
@@ -167,10 +213,11 @@ export default function SettingsPage() {
       <main className="flex-1 p-6 md:p-8 space-y-6">
         <h1 className="text-3xl font-bold font-headline tracking-tight">Settings</h1>
         <Tabs defaultValue="suppliers" className="w-full">
-          <TabsList className="grid w-full grid-cols-2 md:grid-cols-4">
+          <TabsList className="grid w-full grid-cols-2 md:grid-cols-5">
             <TabsTrigger value="suppliers"><Building className="mr-2 h-4 w-4 inline-block" />Suppliers</TabsTrigger>
             <TabsTrigger value="appliances"><Thermometer className="mr-2 h-4 w-4 inline-block" />Appliances</TabsTrigger>
             <TabsTrigger value="cleaning_tasks"><SparklesIcon className="mr-2 h-4 w-4 inline-block" />Cleaning Tasks</TabsTrigger>
+            <TabsTrigger value="users"><Users className="mr-2 h-4 w-4 inline-block" />Users</TabsTrigger>
             <TabsTrigger value="parameters"><ListFilter className="mr-2 h-4 w-4 inline-block" />Parameters</TabsTrigger>
           </TabsList>
 
@@ -270,6 +317,78 @@ export default function SettingsPage() {
               </CardContent>
             </Card>
           </TabsContent>
+
+          <TabsContent value="users">
+            <Card>
+              <CardHeader>
+                <div className="flex justify-between items-center">
+                  <div>
+                    <CardTitle>Manage Users</CardTitle>
+                    <CardDescription>Add, edit, or remove users and manage their roles.</CardDescription>
+                  </div>
+                  <Button onClick={() => openDialog("user")}><PlusCircle className="mr-2 h-4 w-4" /> Add User</Button>
+                </div>
+              </CardHeader>
+              <CardContent>
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Name</TableHead>
+                      <TableHead>Email</TableHead>
+                      <TableHead>Role</TableHead>
+                      <TableHead>Training Records</TableHead>
+                      <TableHead className="text-right">Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {users.map(user => (
+                      <TableRow key={user.id}>
+                        <TableCell>{user.name}</TableCell>
+                        <TableCell>{user.email}</TableCell>
+                        <TableCell><Badge variant={user.role === 'admin' ? "default" : "secondary"}>{user.role.charAt(0).toUpperCase() + user.role.slice(1)}</Badge></TableCell>
+                        <TableCell>
+                          <Popover>
+                            <PopoverTrigger asChild>
+                              <Button variant="link" className="p-0 h-auto">{user.trainingRecords?.length || 0} record(s)</Button>
+                            </PopoverTrigger>
+                            <PopoverContent className="w-80">
+                              <div className="grid gap-4">
+                                <div className="space-y-2">
+                                  <h4 className="font-medium leading-none">Training Records</h4>
+                                  <p className="text-sm text-muted-foreground">
+                                    Details of training completed by {user.name}.
+                                  </p>
+                                </div>
+                                {user.trainingRecords && user.trainingRecords.length > 0 ? (
+                                  <ul className="list-disc pl-5 space-y-1 text-sm">
+                                    {user.trainingRecords.map((record, idx) => (
+                                      <li key={idx}>
+                                        <strong>{record.name}</strong>
+                                        <br />Completed: {record.dateCompleted ? format(parse(record.dateCompleted, 'yyyy-MM-dd', new Date()), 'PP') : 'N/A'}
+                                        {record.expiryDate && (<><br />Expires: {format(parse(record.expiryDate, 'yyyy-MM-dd', new Date()), 'PP')}</>)}
+                                        {record.certificateUrl && (<><br /><a href={record.certificateUrl} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">View Certificate</a></>)}
+                                      </li>
+                                    ))}
+                                  </ul>
+                                ) : (
+                                  <p className="text-sm text-muted-foreground">No training records found.</p>
+                                )}
+                              </div>
+                            </PopoverContent>
+                          </Popover>
+                        </TableCell>
+                        <TableCell className="text-right space-x-1">
+                          <Button variant="ghost" size="icon" onClick={() => openDialog("user", user)}><Edit2 className="h-4 w-4" /></Button>
+                          <Button variant="ghost" size="icon" className="text-destructive hover:text-destructive/80" onClick={() => deleteItem("user", user.id)}><Trash2 className="h-4 w-4" /></Button>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                    {users.length === 0 && <TableRow><TableCell colSpan={5} className="text-center">No users configured.</TableCell></TableRow>}
+                  </TableBody>
+                </Table>
+              </CardContent>
+            </Card>
+          </TabsContent>
           
           <TabsContent value="parameters">
             <Card>
@@ -326,14 +445,6 @@ export default function SettingsPage() {
                     </div>
                   </div>
                 </section>
-
-                <Separator />
-                
-                <section>
-                  <h3 className="text-lg font-semibold mb-2">User Role Management</h3>
-                  <p className="text-sm text-muted-foreground">User role configuration and management will be available in a future update.</p>
-                </section>
-
               </CardContent>
               <CardFooter className="border-t pt-6">
                 <Button onClick={handleSaveParameters}><Save className="mr-2 h-4 w-4" /> Save Parameters</Button>
@@ -347,7 +458,7 @@ export default function SettingsPage() {
             <DialogHeader>
               <DialogTitle>{editingItem ? "Edit" : "Add New"} {currentForm?.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase())}</DialogTitle>
             </DialogHeader>
-            <div className="py-4 max-h-[60vh] overflow-y-auto pr-2">
+            <div className="py-4 max-h-[70vh] overflow-y-auto pr-2">
             {currentForm === "supplier" && (
               <form onSubmit={supplierForm.handleSubmit(handleSupplierSubmit)} className="space-y-4">
                 <Controller name="name" control={supplierForm.control} render={({ field, fieldState }) => (<div><Label htmlFor="s_name">Name</Label><Input id="s_name" {...field} /> {fieldState.error && <p className="text-sm text-destructive">{fieldState.error.message}</p>}</div>)} />
@@ -394,6 +505,33 @@ export default function SettingsPage() {
                 <DialogFooter><Button type="button" variant="outline" onClick={() => setDialogOpen(false)}>Cancel</Button><Button type="submit">Save</Button></DialogFooter>
               </form>
             )}
+            {currentForm === "user" && (
+              <form onSubmit={userForm.handleSubmit(handleUserSubmit)} className="space-y-4">
+                <Controller name="name" control={userForm.control} render={({ field, fieldState }) => (<div><Label htmlFor="u_name">Name</Label><Input id="u_name" {...field} />{fieldState.error && <p className="text-sm text-destructive">{fieldState.error.message}</p>}</div>)} />
+                <Controller name="email" control={userForm.control} render={({ field, fieldState }) => (<div><Label htmlFor="u_email">Email</Label><Input id="u_email" type="email" {...field} />{fieldState.error && <p className="text-sm text-destructive">{fieldState.error.message}</p>}</div>)} />
+                <Controller name="role" control={userForm.control} render={({ field, fieldState }) => (
+                  <div>
+                    <Label htmlFor="u_role">Role</Label>
+                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                      <SelectTrigger id="u_role"><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="admin">Admin</SelectItem>
+                        <SelectItem value="staff">Staff</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    {fieldState.error && <p className="text-sm text-destructive">{fieldState.error.message}</p>}
+                  </div>
+                )} />
+                <Controller name="trainingRecords" control={userForm.control} render={({ field }) => (
+                  <div>
+                    <Label htmlFor="u_training">Training Records</Label>
+                    <Textarea id="u_training" {...field} rows={4} placeholder="Enter one record per line: Name;DateCompleted (YYYY-MM-DD);ExpiryDate (YYYY-MM-DD);CertificateURL" />
+                    <p className="text-xs text-muted-foreground mt-1">Format: Name;YYYY-MM-DD;YYYY-MM-DD (optional);URL (optional)</p>
+                  </div>
+                )} />
+                <DialogFooter><Button type="button" variant="outline" onClick={() => setDialogOpen(false)}>Cancel</Button><Button type="submit">Save User</Button></DialogFooter>
+              </form>
+            )}
             </div>
           </DialogContent>
         </Dialog>
@@ -401,4 +539,3 @@ export default function SettingsPage() {
     </div>
   );
 }
-

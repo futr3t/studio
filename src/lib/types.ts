@@ -76,8 +76,17 @@ export interface CleaningChecklistItem extends CleaningTask {
   notes?: string;
 }
 
+export interface TrainingRecord {
+  name: string;
+  dateCompleted: string; // ISO Date string or YYYY-MM-DD
+  expiryDate?: string; // ISO Date string or YYYY-MM-DD
+  certificateUrl?: string;
+}
+
 export interface User {
   id: string;
   name: string;
+  email: string;
   role: 'admin' | 'staff';
+  trainingRecords?: TrainingRecord[];
 }

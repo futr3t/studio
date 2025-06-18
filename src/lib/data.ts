@@ -1,5 +1,5 @@
-import type { Supplier, Appliance, ProductionLog, DeliveryLog, TemperatureLog, CleaningTask, CleaningChecklistItem } from './types';
-import { formatISO } from 'date-fns';
+import type { Supplier, Appliance, ProductionLog, DeliveryLog, TemperatureLog, CleaningTask, CleaningChecklistItem, User, TrainingRecord } from './types';
+import { formatISO, addYears } from 'date-fns';
 
 export const mockSuppliers: Supplier[] = [
   { id: 'sup1', name: 'Fresh Produce Co.', contactPerson: 'John Appleseed', phone: '555-1234', email: 'john@freshproduce.com' },
@@ -109,3 +109,33 @@ export const mockCleaningChecklist: CleaningChecklistItem[] = mockCleaningTasks.
   completedAt: index % 2 === 0 ? formatISO(new Date(Date.now() - (index + 1) * 60 * 60 * 1000)) : undefined,
   completedBy: index % 2 === 0 ? 'Cleaner Carol' : undefined,
 }));
+
+const today = new Date();
+export const mockUsers: User[] = [
+  {
+    id: 'user1',
+    name: 'Alice Wonderland',
+    email: 'alice@chefcheck.com',
+    role: 'admin',
+    trainingRecords: [
+      { name: 'Food Safety Level 3', dateCompleted: formatISO(addYears(today, -1), { representation: 'date' }), expiryDate: formatISO(addYears(today, 2), { representation: 'date' }), certificateUrl: 'https://example.com/cert/alice1.pdf' },
+      { name: 'HACCP Principles', dateCompleted: formatISO(addYears(today, -1), { representation: 'date' }) },
+    ],
+  },
+  {
+    id: 'user2',
+    name: 'Bob The Builder',
+    email: 'bob@chefcheck.com',
+    role: 'staff',
+    trainingRecords: [
+      { name: 'Food Safety Level 2', dateCompleted: formatISO(new Date(2023, 5, 15), { representation: 'date' }), expiryDate: formatISO(new Date(2026, 5, 14), { representation: 'date' }) },
+    ],
+  },
+  {
+    id: 'user3',
+    name: 'Charlie Brown',
+    email: 'charlie@chefcheck.com',
+    role: 'staff',
+    trainingRecords: [],
+  }
+];
