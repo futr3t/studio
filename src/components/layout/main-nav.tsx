@@ -1,3 +1,4 @@
+
 "use client";
 
 import Link from "next/link";
@@ -10,6 +11,7 @@ import {
   Sparkles,
   SettingsIcon,
   ShieldCheck,
+  FileText,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -21,6 +23,7 @@ const navItems = [
   { href: "/deliveries", label: "Deliveries", icon: Truck },
   { href: "/temperatures", label: "Temperatures", icon: Thermometer },
   { href: "/cleaning", label: "Cleaning", icon: Sparkles },
+  { href: "/reports", label: "Reports", icon: FileText },
   { href: "/settings", label: "Settings", icon: SettingsIcon },
 ];
 
