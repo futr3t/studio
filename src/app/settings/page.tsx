@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useState } from 'react';
@@ -5,10 +6,10 @@ import { MainNav } from "@/components/layout/main-nav";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { PlusCircle, Edit2, Trash2, ListFilter, Building, Thermometer, SparklesIcon } from "lucide-react";
+import { PlusCircle, Edit2, Trash2, ListFilter, Building, Thermometer, SparklesIcon, Save } from "lucide-react";
 import { Supplier, Appliance, CleaningTask, CleaningFrequency } from "@/lib/types";
 import { mockSuppliers, mockAppliances, mockCleaningTasks } from "@/lib/data";
 import {
@@ -25,7 +26,9 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from "@/components/ui/badge";
-
+import { Switch } from "@/components/ui/switch";
+import { useToast } from "@/hooks/use-toast";
+import { Separator } from '@/components/ui/separator';
 
 // Schemas for forms
 const supplierSchema = z.object({
@@ -65,6 +68,19 @@ export default function SettingsPage() {
   const supplierForm = useForm<SupplierFormData>({ resolver: zodResolver(supplierSchema) });
   const applianceForm = useForm<ApplianceFormData>({ resolver: zodResolver(applianceSchema) });
   const cleaningTaskForm = useForm<CleaningTaskFormData>({ resolver: zodResolver(cleaningTaskSchema) });
+  
+  const { toast } = useToast();
+
+  // State for Parameters tab
+  const [fridgeMinTemp, setFridgeMinTemp] = useState<string>("0");
+  const [fridgeMaxTemp, setFridgeMaxTemp] = useState<string>("5");
+  const [freezerMinTemp, setFreezerMinTemp] = useState<string>("-25");
+  const [freezerMaxTemp, setFreezerMaxTemp] = useState<string>("-18");
+  const [hotHoldMinTemp, setHotHoldMinTemp] = useState<string>("63");
+  const [hotHoldMaxTemp, setHotHoldMaxTemp] = useState<string>("75");
+  const [emailAlerts, setEmailAlerts] = useState<boolean>(true);
+  const [smsAlerts, setSmsAlerts] = useState<boolean>(false);
+
 
   const openDialog = (formType: "supplier" | "appliance" | "cleaningTask", itemToEdit: any | null = null) => {
     setCurrentForm(formType);
@@ -82,6 +98,7 @@ export default function SettingsPage() {
       setSuppliers([...suppliers, { id: `sup${suppliers.length + 1}`, ...data }]);
     }
     setDialogOpen(false);
+    toast({ title: "Supplier Saved", description: `Supplier ${data.name} has been ${editingItem ? 'updated' : 'added'}.`, className: "bg-accent text-accent-foreground" });
   };
   
   const handleApplianceSubmit: SubmitHandler<ApplianceFormData> = (data) => {
@@ -91,6 +108,7 @@ export default function SettingsPage() {
       setAppliances([...appliances, { id: `app${appliances.length + 1}`, ...data }]);
     }
     setDialogOpen(false);
+    toast({ title: "Appliance Saved", description: `Appliance ${data.name} has been ${editingItem ? 'updated' : 'added'}.`, className: "bg-accent text-accent-foreground" });
   };
 
   const handleCleaningTaskSubmit: SubmitHandler<CleaningTaskFormData> = (data) => {
@@ -100,12 +118,24 @@ export default function SettingsPage() {
       setCleaningTasks([...cleaningTasks, { id: `ct${cleaningTasks.length + 1}`, ...data }]);
     }
     setDialogOpen(false);
+    toast({ title: "Cleaning Task Saved", description: `Task ${data.name} has been ${editingItem ? 'updated' : 'added'}.`, className: "bg-accent text-accent-foreground" });
   };
 
   const deleteItem = (type: "supplier" | "appliance" | "cleaningTask", id: string) => {
-    if (type === "supplier") setSuppliers(suppliers.filter(s => s.id !== id));
-    if (type === "appliance") setAppliances(appliances.filter(a => a.id !== id));
-    if (type === "cleaningTask") setCleaningTasks(cleaningTasks.filter(t => t.id !== id));
+    let itemName = '';
+    if (type === "supplier") {
+        itemName = suppliers.find(s => s.id === id)?.name || 'Item';
+        setSuppliers(suppliers.filter(s => s.id !== id));
+    }
+    if (type === "appliance") {
+        itemName = appliances.find(a => a.id === id)?.name || 'Item';
+        setAppliances(appliances.filter(a => a.id !== id));
+    }
+    if (type === "cleaningTask") {
+        itemName = cleaningTasks.find(t => t.id === id)?.name || 'Item';
+        setCleaningTasks(cleaningTasks.filter(t => t.id !== id));
+    }
+    toast({ title: "Item Deleted", description: `${itemName} has been removed.`, variant: "destructive" });
   };
   
   const getFrequencyLabel = (freq: CleaningFrequency) => {
@@ -114,6 +144,21 @@ export default function SettingsPage() {
     };
     return labels[freq];
   }
+  
+  const handleSaveParameters = () => {
+    // In a real app, you would save these to a backend/localStorage
+    console.log("Parameters saved:", {
+      fridgeMinTemp, fridgeMaxTemp,
+      freezerMinTemp, freezerMaxTemp,
+      hotHoldMinTemp, hotHoldMaxTemp,
+      emailAlerts, smsAlerts
+    });
+    toast({
+      title: "Parameters Saved",
+      description: "System parameters have been updated.",
+      className: "bg-accent text-accent-foreground"
+    });
+  };
 
 
   return (
@@ -154,6 +199,7 @@ export default function SettingsPage() {
                         </TableCell>
                       </TableRow>
                     ))}
+                     {suppliers.length === 0 && <TableRow><TableCell colSpan={5} className="text-center">No suppliers configured.</TableCell></TableRow>}
                   </TableBody>
                 </Table>
               </CardContent>
@@ -185,6 +231,7 @@ export default function SettingsPage() {
                         </TableCell>
                       </TableRow>
                     ))}
+                    {appliances.length === 0 && <TableRow><TableCell colSpan={6} className="text-center">No appliances configured.</TableCell></TableRow>}
                   </TableBody>
                 </Table>
               </CardContent>
@@ -217,6 +264,7 @@ export default function SettingsPage() {
                         </TableCell>
                       </TableRow>
                     ))}
+                    {cleaningTasks.length === 0 && <TableRow><TableCell colSpan={5} className="text-center">No cleaning tasks configured.</TableCell></TableRow>}
                   </TableBody>
                 </Table>
               </CardContent>
@@ -225,10 +273,71 @@ export default function SettingsPage() {
           
           <TabsContent value="parameters">
             <Card>
-              <CardHeader><CardTitle>System Parameters</CardTitle><CardDescription>Configure general application settings and thresholds (Placeholder).</CardDescription></CardHeader>
-              <CardContent>
-                <p className="text-muted-foreground">Parameter configuration section will be implemented here. This could include things like default temperature ranges, alert notification settings, user roles, etc.</p>
+              <CardHeader>
+                <CardTitle>System Parameters</CardTitle>
+                <CardDescription>Configure general application settings and thresholds.</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-8">
+                <section>
+                  <h3 className="text-lg font-semibold mb-3">Default Temperature Ranges (°C)</h3>
+                  <div className="space-y-4">
+                    <Card className="p-4">
+                      <CardTitle className="text-base mb-2">Fridge</CardTitle>
+                      <div className="grid grid-cols-2 gap-4">
+                        <div><Label htmlFor="fridgeMin">Min Temperature</Label><Input id="fridgeMin" type="number" value={fridgeMinTemp} onChange={(e) => setFridgeMinTemp(e.target.value)} /></div>
+                        <div><Label htmlFor="fridgeMax">Max Temperature</Label><Input id="fridgeMax" type="number" value={fridgeMaxTemp} onChange={(e) => setFridgeMaxTemp(e.target.value)} /></div>
+                      </div>
+                    </Card>
+                     <Card className="p-4">
+                      <CardTitle className="text-base mb-2">Freezer</CardTitle>
+                      <div className="grid grid-cols-2 gap-4">
+                        <div><Label htmlFor="freezerMin">Min Temperature</Label><Input id="freezerMin" type="number" value={freezerMinTemp} onChange={(e) => setFreezerMinTemp(e.target.value)} /></div>
+                        <div><Label htmlFor="freezerMax">Max Temperature</Label><Input id="freezerMax" type="number" value={freezerMaxTemp} onChange={(e) => setFreezerMaxTemp(e.target.value)} /></div>
+                      </div>
+                    </Card>
+                     <Card className="p-4">
+                      <CardTitle className="text-base mb-2">Hot Holding</CardTitle>
+                      <div className="grid grid-cols-2 gap-4">
+                        <div><Label htmlFor="hotHoldMin">Min Temperature</Label><Input id="hotHoldMin" type="number" value={hotHoldMinTemp} onChange={(e) => setHotHoldMinTemp(e.target.value)} /></div>
+                        <div><Label htmlFor="hotHoldMax">Max Temperature</Label><Input id="hotHoldMax" type="number" value={hotHoldMaxTemp} onChange={(e) => setHotHoldMaxTemp(e.target.value)} /></div>
+                      </div>
+                    </Card>
+                  </div>
+                </section>
+
+                <Separator />
+
+                <section>
+                  <h3 className="text-lg font-semibold mb-3">Alert Notification Settings</h3>
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between p-4 border rounded-lg">
+                      <div>
+                        <Label htmlFor="emailAlerts" className="font-medium">Email Notifications</Label>
+                        <p className="text-sm text-muted-foreground">Receive alerts via email for critical issues.</p>
+                      </div>
+                      <Switch id="emailAlerts" checked={emailAlerts} onCheckedChange={setEmailAlerts} />
+                    </div>
+                    <div className="flex items-center justify-between p-4 border rounded-lg">
+                       <div>
+                        <Label htmlFor="smsAlerts" className="font-medium">SMS Notifications</Label>
+                        <p className="text-sm text-muted-foreground">Receive alerts via SMS (if configured).</p>
+                      </div>
+                      <Switch id="smsAlerts" checked={smsAlerts} onCheckedChange={setSmsAlerts} />
+                    </div>
+                  </div>
+                </section>
+
+                <Separator />
+                
+                <section>
+                  <h3 className="text-lg font-semibold mb-2">User Role Management</h3>
+                  <p className="text-sm text-muted-foreground">User role configuration and management will be available in a future update.</p>
+                </section>
+
               </CardContent>
+              <CardFooter className="border-t pt-6">
+                <Button onClick={handleSaveParameters}><Save className="mr-2 h-4 w-4" /> Save Parameters</Button>
+              </CardFooter>
             </Card>
           </TabsContent>
         </Tabs>
@@ -238,7 +347,7 @@ export default function SettingsPage() {
             <DialogHeader>
               <DialogTitle>{editingItem ? "Edit" : "Add New"} {currentForm?.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase())}</DialogTitle>
             </DialogHeader>
-            <div className="py-4">
+            <div className="py-4 max-h-[60vh] overflow-y-auto pr-2">
             {currentForm === "supplier" && (
               <form onSubmit={supplierForm.handleSubmit(handleSupplierSubmit)} className="space-y-4">
                 <Controller name="name" control={supplierForm.control} render={({ field, fieldState }) => (<div><Label htmlFor="s_name">Name</Label><Input id="s_name" {...field} /> {fieldState.error && <p className="text-sm text-destructive">{fieldState.error.message}</p>}</div>)} />
@@ -292,3 +401,4 @@ export default function SettingsPage() {
     </div>
   );
 }
+
