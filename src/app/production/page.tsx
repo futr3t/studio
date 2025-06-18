@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useState } from 'react';
@@ -12,8 +13,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import { PlusCircle, Edit2, Trash2 } from "lucide-react";
 import { ProductionLog } from "@/lib/types";
-import { mockProductionLogs } from "@/lib/data";
-import { format } from 'date-fns';
+import { format, parseISO } from 'date-fns';
 import {
   Dialog,
   DialogContent,
@@ -21,11 +21,12 @@ import {
   DialogTitle,
   DialogDescription,
   DialogFooter,
-  DialogTrigger,
 } from "@/components/ui/dialog";
 import { useForm, Controller, SubmitHandler } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
+import { useData } from '@/context/DataContext';
+import { useToast } from "@/hooks/use-toast";
 
 const productionLogSchema = z.object({
   productName: z.string().min(1, "Product name is required"),
@@ -39,11 +40,13 @@ const productionLogSchema = z.object({
 type ProductionLogFormData = z.infer<typeof productionLogSchema>;
 
 export default function ProductionPage() {
-  const [logs, setLogs] = useState<ProductionLog[]>(mockProductionLogs);
+  const { productionLogs, addProductionLog, updateProductionLog, deleteProductionLog: deleteLogFromContext } = useData();
+  const { toast } = useToast();
+  
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingLog, setEditingLog] = useState<ProductionLog | null>(null);
 
-  const { control, handleSubmit, reset, setValue } = useForm<ProductionLogFormData>({
+  const { control, handleSubmit, reset, watch, setValue } = useForm<ProductionLogFormData>({
     resolver: zodResolver(productionLogSchema),
     defaultValues: {
       productName: "",
@@ -54,6 +57,16 @@ export default function ProductionPage() {
       verifiedBy: "",
     },
   });
+
+  const isCompliantValue = watch("isCompliant");
+  React.useEffect(() => {
+    if (!isCompliantValue) {
+        // If marked as non-compliant, correctiveAction might become required or focused
+    } else {
+        setValue("correctiveAction", ""); // Clear corrective action if compliant
+    }
+  }, [isCompliantValue, setValue]);
+
 
   const openDialogForNew = () => {
     reset({
@@ -83,21 +96,22 @@ export default function ProductionPage() {
 
   const onSubmit: SubmitHandler<ProductionLogFormData> = (data) => {
     if (editingLog) {
-      setLogs(logs.map(log => log.id === editingLog.id ? { ...editingLog, ...data, logTime: new Date().toISOString() } : log));
+      updateProductionLog({ ...editingLog, ...data });
+      toast({ title: "Log Updated", description: `${data.productName} log has been updated.`, className: "bg-accent text-accent-foreground" });
     } else {
-      const newLog: ProductionLog = {
-        id: `prod${logs.length + 1}`,
-        ...data,
-        logTime: new Date().toISOString(),
-      };
-      setLogs([newLog, ...logs]);
+      addProductionLog(data);
+      toast({ title: "Log Added", description: `${data.productName} log has been added.`, className: "bg-accent text-accent-foreground" });
     }
     setIsDialogOpen(false);
     setEditingLog(null);
   };
   
-  const deleteLog = (id: string) => {
-    setLogs(logs.filter(log => log.id !== id));
+  const handleDelete = (id: string) => {
+    const logToDelete = productionLogs.find(log => log.id === id);
+    deleteLogFromContext(id);
+    if (logToDelete) {
+      toast({ title: "Log Deleted", description: `${logToDelete.productName} log has been removed.`, variant: "destructive" });
+    }
   };
 
   return (
@@ -119,7 +133,7 @@ export default function ProductionPage() {
                 {editingLog ? "Update the details of this production log." : "Enter details for a new production log."}
               </DialogDescription>
             </DialogHeader>
-            <form onSubmit={handleSubmit(onSubmit)} className="space-y-4 py-4">
+            <form onSubmit={handleSubmit(onSubmit)} className="space-y-4 py-4 max-h-[70vh] overflow-y-auto pr-2">
               <Controller
                 name="productName"
                 control={control}
@@ -158,8 +172,8 @@ export default function ProductionPage() {
                 control={control}
                 render={({ field }) => (
                   <div className="flex items-center space-x-2">
-                    <Checkbox id="isCompliant" checked={field.value} onCheckedChange={field.onChange} />
-                    <Label htmlFor="isCompliant">Is Compliant?</Label>
+                    <Checkbox id="isCompliantProd" checked={field.value} onCheckedChange={field.onChange} />
+                    <Label htmlFor="isCompliantProd">Is Compliant?</Label>
                   </div>
                 )}
               />
@@ -169,7 +183,7 @@ export default function ProductionPage() {
                 render={({ field }) => (
                   <div>
                     <Label htmlFor="correctiveAction">Corrective Action (if not compliant)</Label>
-                    <Textarea id="correctiveAction" {...field} placeholder="e.g., Re-cooked to target temperature, Discarded batch" />
+                    <Textarea id="correctiveAction" {...field} placeholder="e.g., Re-cooked to target temperature, Discarded batch" disabled={isCompliantValue} />
                   </div>
                 )}
               />
@@ -211,16 +225,16 @@ export default function ProductionPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {logs.length === 0 && (
+                {productionLogs.length === 0 && (
                   <TableRow>
                     <TableCell colSpan={8} className="text-center">No production logs yet.</TableCell>
                   </TableRow>
                 )}
-                {logs.map((log) => (
+                {productionLogs.map((log) => (
                   <TableRow key={log.id} className={!log.isCompliant ? "bg-destructive/10" : ""}>
                     <TableCell className="font-medium">{log.productName}</TableCell>
                     <TableCell>{log.batchCode}</TableCell>
-                    <TableCell>{format(new Date(log.logTime), "PPpp")}</TableCell>
+                    <TableCell>{format(parseISO(log.logTime), "PPpp")}</TableCell>
                     <TableCell>{log.criticalLimitDetails}</TableCell>
                     <TableCell>
                       <Badge variant={log.isCompliant ? "default" : "destructive"} className={log.isCompliant ? "bg-accent text-accent-foreground hover:bg-accent/80" : ""}>
@@ -234,7 +248,7 @@ export default function ProductionPage() {
                         <Edit2 className="h-4 w-4" />
                         <span className="sr-only">Edit Log</span>
                       </Button>
-                      <Button variant="ghost" size="icon" onClick={() => deleteLog(log.id)} className="text-destructive hover:text-destructive/80">
+                      <Button variant="ghost" size="icon" onClick={() => handleDelete(log.id)} className="text-destructive hover:text-destructive/80">
                         <Trash2 className="h-4 w-4" />
                         <span className="sr-only">Delete Log</span>
                       </Button>

@@ -1,6 +1,7 @@
+
 "use client";
 
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { MainNav } from "@/components/layout/main-nav";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -11,8 +12,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import { Thermometer, Edit2, Trash2, AlertCircle } from "lucide-react";
 import { Appliance, TemperatureLog } from "@/lib/types";
-import { mockAppliances, mockTemperatureLogs } from "@/lib/data";
-import { format } from 'date-fns';
+import { format, parseISO } from 'date-fns';
 import {
   Dialog,
   DialogContent,
@@ -24,9 +24,11 @@ import {
 import { useForm, Controller, SubmitHandler } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
+import { useData } from '@/context/DataContext';
+import { useToast } from "@/hooks/use-toast";
 
 const temperatureLogSchema = z.object({
-  temperature: z.coerce.number({ invalid_type_error: "Temperature is required" }),
+  temperature: z.coerce.number({ required_error: "Temperature is required", invalid_type_error: "Temperature must be a number" }),
   correctiveAction: z.string().optional(),
   loggedBy: z.string().optional(),
 });
@@ -34,11 +36,12 @@ const temperatureLogSchema = z.object({
 type TemperatureLogFormData = z.infer<typeof temperatureLogSchema>;
 
 export default function TemperaturesPage() {
-  const [logs, setLogs] = useState<TemperatureLog[]>(mockTemperatureLogs);
-  const [appliances] = useState<Appliance[]>(mockAppliances);
+  const { temperatureLogs, appliances, addTemperatureLog, updateTemperatureLog, deleteTemperatureLog: deleteLogFromContext } = useData();
+  const { toast } = useToast();
+
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [selectedAppliance, setSelectedAppliance] = useState<Appliance | null>(null);
-  const [editingLog, setEditingLog] = useState<TemperatureLog | null>(null); // Not used for new logs via grid, but could be for editing existing logs
+  const [editingLog, setEditingLog] = useState<TemperatureLog | null>(null);
 
   const { control, handleSubmit, reset, watch, setValue } = useForm<TemperatureLogFormData>({
     resolver: zodResolver(temperatureLogSchema),
@@ -46,7 +49,8 @@ export default function TemperaturesPage() {
   });
 
   const currentTemperature = watch("temperature");
-  const isCompliant = React.useMemo(() => {
+  
+  const isCurrentLogCompliant = useMemo(() => {
     if (selectedAppliance && typeof currentTemperature === 'number') {
       const { minTemp, maxTemp } = selectedAppliance;
       if (typeof minTemp === 'number' && currentTemperature < minTemp) return false;
@@ -57,15 +61,17 @@ export default function TemperaturesPage() {
 
   const openLogDialog = (appliance: Appliance) => {
     setSelectedAppliance(appliance);
-    setEditingLog(null); // Ensure it's a new log
+    setEditingLog(null);
     reset({ temperature: undefined, correctiveAction: "", loggedBy: "" });
     setIsDialogOpen(true);
   };
   
   const openEditDialog = (log: TemperatureLog) => {
     const appliance = appliances.find(a => a.id === log.applianceId);
-    if (!appliance) return; // Should not happen with mock data
-    
+    if (!appliance) {
+        toast({title: "Error", description: "Appliance not found for this log.", variant: "destructive"});
+        return;
+    }
     setSelectedAppliance(appliance);
     setEditingLog(log);
     reset({
@@ -77,35 +83,35 @@ export default function TemperaturesPage() {
   };
 
   const onSubmit: SubmitHandler<TemperatureLogFormData> = (data) => {
-    if (!selectedAppliance) return;
+    if (!selectedAppliance) {
+        toast({title: "Error", description: "No appliance selected.", variant: "destructive"});
+        return;
+    }
 
     if (editingLog) {
-       setLogs(logs.map(l => l.id === editingLog.id ? { 
+       updateTemperatureLog({ 
            ...editingLog, 
            ...data, 
            temperature: Number(data.temperature),
-           isCompliant,
-           logTime: new Date().toISOString() 
-        } : l));
+        }, selectedAppliance);
+       toast({ title: "Log Updated", className: "bg-accent text-accent-foreground" });
     } else {
-        const newLog: TemperatureLog = {
-        id: `temp${logs.length + 1}`,
-        applianceId: selectedAppliance.id,
-        temperature: Number(data.temperature),
-        logTime: new Date().toISOString(),
-        isCompliant,
-        correctiveAction: data.correctiveAction,
-        loggedBy: data.loggedBy,
-        };
-        setLogs([newLog, ...logs]);
+        addTemperatureLog({ 
+            applianceId: selectedAppliance.id,
+            temperature: Number(data.temperature),
+            correctiveAction: data.correctiveAction,
+            loggedBy: data.loggedBy,
+        }, selectedAppliance);
+       toast({ title: "Log Added", className: "bg-accent text-accent-foreground" });
     }
     setIsDialogOpen(false);
     setSelectedAppliance(null);
     setEditingLog(null);
   };
 
-  const deleteLog = (id: string) => {
-    setLogs(logs.filter(log => log.id !== id));
+  const handleDelete = (id: string) => {
+    deleteLogFromContext(id);
+    toast({ title: "Log Deleted", variant: "destructive" });
   };
 
   const getApplianceName = (applianceId: string) => appliances.find(a => a.id === applianceId)?.name || 'Unknown Appliance';
@@ -134,6 +140,7 @@ export default function TemperaturesPage() {
                 <span className="text-xs text-muted-foreground">{appliance.location}</span>
               </Button>
             ))}
+             {appliances.length === 0 && <p className="col-span-full text-center text-muted-foreground">No appliances configured. Please add appliances in Settings.</p>}
           </CardContent>
         </Card>
 
@@ -153,7 +160,7 @@ export default function TemperaturesPage() {
                 Enter the current temperature and any corrective actions if necessary.
                 {selectedAppliance && (typeof selectedAppliance.minTemp === 'number' || typeof selectedAppliance.maxTemp === 'number') && (
                   <span className="block text-xs mt-1">
-                    Expected range: {selectedAppliance.minTemp ?? "any"}°C to {selectedAppliance.maxTemp ?? "any"}°C.
+                    Expected range: {selectedAppliance.minTemp ?? "N/A"}°C to {selectedAppliance.maxTemp ?? "N/A"}°C.
                   </span>
                 )}
               </DialogDescription>
@@ -164,13 +171,13 @@ export default function TemperaturesPage() {
                 control={control}
                 render={({ field, fieldState }) => (
                   <div>
-                    <Label htmlFor="temperature">Temperature (°C)</Label>
-                    <Input id="temperature" type="number" step="0.1" {...field} placeholder="e.g., 4.5" />
+                    <Label htmlFor="temperatureLog">Temperature (°C)</Label>
+                    <Input id="temperatureLog" type="number" step="0.1" {...field} placeholder="e.g., 4.5" />
                     {fieldState.error && <p className="text-sm text-destructive">{fieldState.error.message}</p>}
                   </div>
                 )}
               />
-              {!isCompliant && typeof currentTemperature === 'number' && (
+              {!isCurrentLogCompliant && typeof currentTemperature === 'number' && (
                 <div className="p-3 bg-destructive/10 border border-destructive/20 rounded-md text-sm text-destructive flex items-start space-x-2">
                   <AlertCircle className="h-5 w-5 mt-0.5 shrink-0" />
                   <span>Temperature is outside the expected range for {selectedAppliance?.name}. Please specify corrective action.</span>
@@ -181,8 +188,8 @@ export default function TemperaturesPage() {
                 control={control}
                 render={({ field }) => (
                   <div>
-                    <Label htmlFor="correctiveAction">Corrective Action (if applicable)</Label>
-                    <Textarea id="correctiveAction" {...field} placeholder="e.g., Adjusted thermostat, notified manager" />
+                    <Label htmlFor="correctiveActionTemp">Corrective Action (if applicable)</Label>
+                    <Textarea id="correctiveActionTemp" {...field} placeholder="e.g., Adjusted thermostat, notified manager" disabled={isCurrentLogCompliant && !editingLog?.correctiveAction} />
                   </div>
                 )}
               />
@@ -191,8 +198,8 @@ export default function TemperaturesPage() {
                 control={control}
                 render={({ field }) => (
                   <div>
-                    <Label htmlFor="loggedBy">Logged By</Label>
-                    <Input id="loggedBy" {...field} placeholder="e.g., John Doe" />
+                    <Label htmlFor="loggedByTemp">Logged By</Label>
+                    <Input id="loggedByTemp" {...field} placeholder="e.g., John Doe" />
                   </div>
                 )}
               />
@@ -223,16 +230,16 @@ export default function TemperaturesPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {logs.length === 0 && (
+                {temperatureLogs.length === 0 && (
                   <TableRow>
                     <TableCell colSpan={7} className="text-center">No temperature logs yet.</TableCell>
                   </TableRow>
                 )}
-                {logs.map((log) => (
+                {temperatureLogs.map((log) => (
                   <TableRow key={log.id} className={!log.isCompliant ? "bg-destructive/10" : ""}>
                     <TableCell className="font-medium">{getApplianceName(log.applianceId)}</TableCell>
                     <TableCell>{log.temperature.toFixed(1)}</TableCell>
-                    <TableCell>{format(new Date(log.logTime), "PPpp")}</TableCell>
+                    <TableCell>{format(parseISO(log.logTime), "PPpp")}</TableCell>
                     <TableCell>
                       <Badge variant={log.isCompliant ? "default" : "destructive"} className={log.isCompliant ? "bg-accent text-accent-foreground hover:bg-accent/80" : ""}>
                         {log.isCompliant ? "Compliant" : "Non-Compliant"}
@@ -245,7 +252,7 @@ export default function TemperaturesPage() {
                         <Edit2 className="h-4 w-4" />
                          <span className="sr-only">Edit Log</span>
                        </Button>
-                       <Button variant="ghost" size="icon" onClick={() => deleteLog(log.id)} className="text-destructive hover:text-destructive/80">
+                       <Button variant="ghost" size="icon" onClick={() => handleDelete(log.id)} className="text-destructive hover:text-destructive/80">
                          <Trash2 className="h-4 w-4" />
                          <span className="sr-only">Delete Log</span>
                        </Button>

@@ -1,7 +1,9 @@
+
 "use client";
 
+import React, { useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { BarChart, CheckCircle2, AlertTriangle, ListChecks, ClipboardList, Thermometer, Sparkles } from "lucide-react";
+import { BarChart, CheckCircle2, AlertTriangle, ListChecks, ClipboardList, Thermometer, Sparkles, Truck } from "lucide-react";
 import { MainNav } from "@/components/layout/main-nav";
 import {
   ChartContainer,
@@ -10,17 +12,13 @@ import {
   ChartLegend,
   ChartLegendContent,
 } from "@/components/ui/chart"
-import { Bar, CartesianGrid, XAxis, YAxis, Tooltip as RechartsTooltip, ResponsiveContainer, BarChart as RechartsBarChart } from "recharts"
+import { Bar, CartesianGrid, XAxis, YAxis, ResponsiveContainer, BarChart as RechartsBarChart } from "recharts"
 import type { ChartConfig } from "@/components/ui/chart";
+import { useData } from "@/context/DataContext";
+import { format, parseISO } from 'date-fns';
+import { Badge } from '@/components/ui/badge';
+import { cn } from '@/lib/utils';
 
-const chartData = [
-  { month: "January", compliant: 186, nonCompliant: 30 },
-  { month: "February", compliant: 305, nonCompliant: 20 },
-  { month: "March", compliant: 237, nonCompliant: 15 },
-  { month: "April", compliant: 273, nonCompliant: 40 },
-  { month: "May", compliant: 209, nonCompliant: 25 },
-  { month: "June", compliant: 214, nonCompliant: 10 },
-]
 
 const chartConfig = {
   compliant: {
@@ -35,10 +33,64 @@ const chartConfig = {
 
 
 export default function DashboardPage() {
-  // Placeholder data
-  const complianceRate = 88;
-  const pendingTasks = 3;
-  const recentAlerts = 1;
+  const { 
+    productionLogs, 
+    temperatureLogs, 
+    deliveryLogs, 
+    cleaningChecklistItems, 
+    getRecentActivities 
+  } = useData();
+
+  const recentActivities = useMemo(() => getRecentActivities(5), [getRecentActivities]);
+
+  const complianceData = useMemo(() => {
+    const allLogs = [
+      ...productionLogs.map(l => ({ ...l, type: 'Production' })),
+      ...temperatureLogs.map(l => ({ ...l, type: 'Temperature' })),
+      ...deliveryLogs.map(l => ({ ...l, type: 'Delivery' })),
+      // Cleaning tasks are generally about completion, not boolean compliance in the same way.
+      // We can count completed vs pending for cleaning tasks.
+    ];
+    
+    const compliantCount = allLogs.filter(l => l.isCompliant).length;
+    const totalCount = allLogs.length;
+    const complianceRate = totalCount > 0 ? Math.round((compliantCount / totalCount) * 100) : 100;
+
+    // For chart data (monthly)
+    const months = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+    const monthlyData: { month: string, compliant: number, nonCompliant: number }[] = months.map(m => ({ month: m, compliant: 0, nonCompliant: 0 }));
+
+    allLogs.forEach(log => {
+      const monthIndex = parseISO(log.logTime || log.deliveryTime).getMonth();
+      if (log.isCompliant) {
+        monthlyData[monthIndex].compliant++;
+      } else {
+        monthlyData[monthIndex].nonCompliant++;
+      }
+    });
+    // Filter to only months with data or recent past months for display if needed
+    const currentMonth = new Date().getMonth();
+    const displayMonths = monthlyData.slice(Math.max(0, currentMonth - 5), currentMonth + 1);
+
+
+    return {
+      rate: complianceRate,
+      chartData: displayMonths.length > 1 ? displayMonths : monthlyData.slice(0,6) // Fallback to first 6 months if not enough recent data
+    };
+  }, [productionLogs, temperatureLogs, deliveryLogs]);
+
+  const pendingCleaningTasks = useMemo(() => {
+    return cleaningChecklistItems.filter(item => !item.completed).length;
+  }, [cleaningChecklistItems]);
+
+  const activeAlertsCount = useMemo(() => {
+    return [
+      ...productionLogs.filter(l => !l.isCompliant),
+      ...temperatureLogs.filter(l => !l.isCompliant),
+      ...deliveryLogs.filter(l => !l.isCompliant)
+    ].length;
+  }, [productionLogs, temperatureLogs, deliveryLogs]);
+
 
   return (
     <div className="flex flex-col min-h-screen">
@@ -53,10 +105,8 @@ export default function DashboardPage() {
               <CheckCircle2 className="h-5 w-5 text-green-500" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{complianceRate}%</div>
-              <p className="text-xs text-muted-foreground">
-                {complianceRate > 90 ? "+2% from last month" : "-1% from last month"}
-              </p>
+              <div className="text-2xl font-bold">{complianceData.rate}%</div>
+              {/* <p className="text-xs text-muted-foreground">Dynamic change from last month</p> */}
             </CardContent>
           </Card>
 
@@ -66,9 +116,9 @@ export default function DashboardPage() {
               <ListChecks className="h-5 w-5 text-blue-500" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{pendingTasks}</div>
+              <div className="text-2xl font-bold">{pendingCleaningTasks}</div>
               <p className="text-xs text-muted-foreground">
-                Due this week
+                Due based on schedule
               </p>
             </CardContent>
           </Card>
@@ -79,9 +129,9 @@ export default function DashboardPage() {
               <AlertTriangle className="h-5 w-5 text-red-500" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{recentAlerts}</div>
+              <div className="text-2xl font-bold">{activeAlertsCount}</div>
               <p className="text-xs text-muted-foreground">
-                Require immediate attention
+                Non-compliant logs
               </p>
             </CardContent>
           </Card>
@@ -95,7 +145,7 @@ export default function DashboardPage() {
             </CardHeader>
             <CardContent>
               <ChartContainer config={chartConfig} className="h-[300px] w-full">
-                <RechartsBarChart accessibilityLayer data={chartData}>
+                <RechartsBarChart accessibilityLayer data={complianceData.chartData}>
                   <CartesianGrid vertical={false} />
                   <XAxis
                     dataKey="month"
@@ -121,31 +171,32 @@ export default function DashboardPage() {
               <CardTitle>Recent Activity</CardTitle>
               <CardDescription>Latest logs and system events</CardDescription>
             </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="flex items-center space-x-3 p-3 bg-card-foreground/5 rounded-md">
-                <Thermometer className="h-5 w-5 text-blue-500" />
-                <div>
-                  <p className="text-sm font-medium">Temperature Logged: Fridge A (-18°C)</p>
-                  <p className="text-xs text-muted-foreground">2 minutes ago by John Doe</p>
-                </div>
-                <CheckCircle2 className="h-5 w-5 text-green-500 ml-auto" />
-              </div>
-              <div className="flex items-center space-x-3 p-3 bg-card-foreground/5 rounded-md">
-                <ClipboardList className="h-5 w-5 text-orange-500" />
-                <div>
-                  <p className="text-sm font-medium">Production Log: Beef Stew (Batch #102)</p>
-                  <p className="text-xs text-muted-foreground">15 minutes ago by Jane Smith</p>
-                </div>
-                <AlertTriangle className="h-5 w-5 text-red-500 ml-auto" />
-              </div>
-              <div className="flex items-center space-x-3 p-3 bg-card-foreground/5 rounded-md">
-                <Sparkles className="h-5 w-5 text-purple-500" />
-                <div>
-                  <p className="text-sm font-medium">Cleaning Task Completed: Sanitize Surfaces</p>
-                  <p className="text-xs text-muted-foreground">1 hour ago by Mike Johnson</p>
-                </div>
-                 <CheckCircle2 className="h-5 w-5 text-green-500 ml-auto" />
-              </div>
+            <CardContent className="space-y-3 max-h-[300px] overflow-y-auto">
+              {recentActivities.length === 0 && (
+                <p className="text-sm text-muted-foreground">No recent activity.</p>
+              )}
+              {recentActivities.map((activity) => {
+                const ItemIcon = activity.itemIcon;
+                const StatusIcon = activity.statusIcon;
+                return (
+                  <div key={activity.id} className={cn("flex items-center space-x-3 p-3 rounded-md", activity.isNonCompliant ? "bg-destructive/10" : "bg-card-foreground/5")}>
+                    <ItemIcon className={cn("h-5 w-5", 
+                      activity.logType === 'temperature' ? "text-blue-500" :
+                      activity.logType === 'production' ? "text-orange-500" :
+                      activity.logType === 'cleaning' ? "text-purple-500" :
+                      activity.logType === 'delivery' ? "text-indigo-500" : "text-gray-500"
+                    )} />
+                    <div className="flex-1">
+                      <p className="text-sm font-medium">{activity.description}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {format(parseISO(activity.timestamp), "PPpp")}
+                        {activity.user && ` by ${activity.user}`}
+                      </p>
+                    </div>
+                    <StatusIcon className={cn("h-5 w-5 ml-auto", activity.isNonCompliant ? "text-red-500" : "text-green-500")} />
+                  </div>
+                );
+              })}
             </CardContent>
           </Card>
         </div>

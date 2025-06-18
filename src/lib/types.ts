@@ -60,7 +60,7 @@ export interface TemperatureLog {
 
 export type CleaningFrequency = 'daily' | 'weekly' | 'monthly' | 'as_needed';
 
-export interface CleaningTask {
+export interface CleaningTask { // Definition
   id: string;
   name: string;
   area: string;
@@ -69,10 +69,16 @@ export interface CleaningTask {
   equipment?: string[]; // list of equipment/chemicals needed
 }
 
-export interface CleaningChecklistItem extends CleaningTask {
+export interface CleaningChecklistItem { // Instance of a task for logging
+  id: string; // Can be same as task.id if checklist is generated daily/weekly or unique if persistent
+  taskId: string; // Link to CleaningTask definition
+  name: string;
+  area: string;
+  frequency: CleaningFrequency;
+  description?: string;
   completed: boolean;
   completedAt?: string; // ISO Date string
-  completedBy?: string;
+  completedBy?: string; // User ID or name
   notes?: string;
 }
 
@@ -89,4 +95,16 @@ export interface User {
   email: string;
   role: 'admin' | 'staff';
   trainingRecords?: TrainingRecord[];
+}
+
+// For Dashboard Recent Activity
+export interface ActivityFeedItem {
+  id: string; // Unique ID for the feed item (e.g., `logType-logId`)
+  timestamp: string; // ISO string for sorting
+  description: string;
+  user?: string;
+  statusIcon: React.ElementType; // Lucide icon component
+  itemIcon: React.ElementType; // Lucide icon component for the item type
+  isNonCompliant?: boolean; // Optional flag for styling
+  logType: 'production' | 'delivery' | 'temperature' | 'cleaning';
 }

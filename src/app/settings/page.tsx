@@ -11,7 +11,6 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { PlusCircle, Edit2, Trash2, ListFilter, Building, Thermometer, SparklesIcon, Save, Users } from "lucide-react";
 import { Supplier, Appliance, CleaningTask, CleaningFrequency, User, TrainingRecord } from "@/lib/types";
-import { mockSuppliers, mockAppliances, mockCleaningTasks, mockUsers } from "@/lib/data";
 import {
   Dialog,
   DialogContent,
@@ -31,6 +30,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Separator } from '@/components/ui/separator';
 import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover';
 import { format, parse, isValid } from 'date-fns';
+import { useData } from '@/context/DataContext';
 
 // Schemas for forms
 const supplierSchema = z.object({
@@ -50,7 +50,7 @@ const applianceSchema = z.object({
 });
 type ApplianceFormData = z.infer<typeof applianceSchema>;
 
-const cleaningTaskSchema = z.object({
+const cleaningTaskSchema = z.object({ // For task definitions
   name: z.string().min(1, "Task name is required"),
   area: z.string().min(1, "Area is required"),
   frequency: z.enum(['daily', 'weekly', 'monthly', 'as_needed']),
@@ -68,10 +68,14 @@ type UserFormData = z.infer<typeof userSchema>;
 
 
 export default function SettingsPage() {
-  const [suppliers, setSuppliers] = useState<Supplier[]>(mockSuppliers);
-  const [appliances, setAppliances] = useState<Appliance[]>(mockAppliances);
-  const [cleaningTasks, setCleaningTasks] = useState<CleaningTask[]>(mockCleaningTasks);
-  const [users, setUsers] = useState<User[]>(mockUsers);
+  const { 
+    suppliers, addSupplier, updateSupplier, deleteSupplier,
+    appliances, addAppliance, updateAppliance, deleteAppliance,
+    cleaningTasks, addCleaningTaskDefinition, updateCleaningTaskDefinition, deleteCleaningTaskDefinition,
+    users, addUser, updateUser, deleteUser
+  } = useData();
+  
+  const { toast } = useToast();
 
   const [dialogOpen, setDialogOpen] = useState(false);
   const [currentForm, setCurrentForm] = useState<"supplier" | "appliance" | "cleaningTask" | "user" | null>(null);
@@ -82,8 +86,7 @@ export default function SettingsPage() {
   const cleaningTaskForm = useForm<CleaningTaskFormData>({ resolver: zodResolver(cleaningTaskSchema) });
   const userForm = useForm<UserFormData>({ resolver: zodResolver(userSchema) });
   
-  const { toast } = useToast();
-
+  // Parameters state (local to this component for now, could be moved to context if needed globally)
   const [fridgeMinTemp, setFridgeMinTemp] = useState<string>("0");
   const [fridgeMaxTemp, setFridgeMaxTemp] = useState<string>("5");
   const [freezerMinTemp, setFreezerMinTemp] = useState<string>("-25");
@@ -110,7 +113,6 @@ export default function SettingsPage() {
     return records.map(r => `${r.name};${r.dateCompleted};${r.expiryDate || ''};${r.certificateUrl || ''}`).join('\n');
   };
 
-
   const openDialog = (formType: "supplier" | "appliance" | "cleaningTask" | "user", itemToEdit: any | null = null) => {
     setCurrentForm(formType);
     setEditingItem(itemToEdit);
@@ -123,32 +125,29 @@ export default function SettingsPage() {
 
   const handleSupplierSubmit: SubmitHandler<SupplierFormData> = (data) => {
     if (editingItem) {
-      setSuppliers(suppliers.map(s => s.id === editingItem.id ? { ...s, ...data } : s));
+      updateSupplier({ ...editingItem, ...data });
     } else {
-      setSuppliers([...suppliers, { id: `sup${Date.now()}`, ...data }]);
+      addSupplier(data);
     }
     setDialogOpen(false);
-    toast({ title: "Supplier Saved", description: `Supplier ${data.name} has been ${editingItem ? 'updated' : 'added'}.`, className: "bg-accent text-accent-foreground" });
   };
   
   const handleApplianceSubmit: SubmitHandler<ApplianceFormData> = (data) => {
     if (editingItem) {
-      setAppliances(appliances.map(a => a.id === editingItem.id ? { ...a, ...data } : a));
+      updateAppliance({ ...editingItem, ...data });
     } else {
-      setAppliances([...appliances, { id: `app${Date.now()}`, ...data }]);
+      addAppliance(data);
     }
     setDialogOpen(false);
-    toast({ title: "Appliance Saved", description: `Appliance ${data.name} has been ${editingItem ? 'updated' : 'added'}.`, className: "bg-accent text-accent-foreground" });
   };
 
   const handleCleaningTaskSubmit: SubmitHandler<CleaningTaskFormData> = (data) => {
     if (editingItem) {
-      setCleaningTasks(cleaningTasks.map(t => t.id === editingItem.id ? { ...t, ...data } : t));
+      updateCleaningTaskDefinition({ ...editingItem, ...data });
     } else {
-      setCleaningTasks([...cleaningTasks, { id: `ct${Date.now()}`, ...data }]);
+      addCleaningTaskDefinition(data);
     }
     setDialogOpen(false);
-    toast({ title: "Cleaning Task Saved", description: `Task ${data.name} has been ${editingItem ? 'updated' : 'added'}.`, className: "bg-accent text-accent-foreground" });
   };
 
   const handleUserSubmit: SubmitHandler<UserFormData> = (data) => {
@@ -156,33 +155,18 @@ export default function SettingsPage() {
     const userData = { ...data, trainingRecords: parsedRecords };
 
     if (editingItem) {
-      setUsers(users.map(u => u.id === editingItem.id ? { ...editingItem, ...userData } : u));
+      updateUser({ ...editingItem, ...userData });
     } else {
-      setUsers([...users, { id: `user${Date.now()}`, ...userData }]);
+      addUser(userData);
     }
     setDialogOpen(false);
-    toast({ title: "User Saved", description: `User ${data.name} has been ${editingItem ? 'updated' : 'added'}.`, className: "bg-accent text-accent-foreground" });
   };
 
-  const deleteItem = (type: "supplier" | "appliance" | "cleaningTask" | "user", id: string) => {
-    let itemName = '';
-    if (type === "supplier") {
-        itemName = suppliers.find(s => s.id === id)?.name || 'Item';
-        setSuppliers(suppliers.filter(s => s.id !== id));
-    }
-    if (type === "appliance") {
-        itemName = appliances.find(a => a.id === id)?.name || 'Item';
-        setAppliances(appliances.filter(a => a.id !== id));
-    }
-    if (type === "cleaningTask") {
-        itemName = cleaningTasks.find(t => t.id === id)?.name || 'Item';
-        setCleaningTasks(cleaningTasks.filter(t => t.id !== id));
-    }
-    if (type === "user") {
-        itemName = users.find(u => u.id === id)?.name || 'Item';
-        setUsers(users.filter(u => u.id !== id));
-    }
-    toast({ title: `${type.charAt(0).toUpperCase() + type.slice(1)} Deleted`, description: `${itemName} has been removed.`, variant: "destructive" });
+  const handleDeleteItem = (type: "supplier" | "appliance" | "cleaningTask" | "user", id: string) => {
+    if (type === "supplier") deleteSupplier(id);
+    if (type === "appliance") deleteAppliance(id);
+    if (type === "cleaningTask") deleteCleaningTaskDefinition(id);
+    if (type === "user") deleteUser(id);
   };
   
   const getFrequencyLabel = (freq: CleaningFrequency) => {
@@ -193,7 +177,8 @@ export default function SettingsPage() {
   }
   
   const handleSaveParameters = () => {
-    console.log("Parameters saved:", {
+    // In a real app, these would be saved to a backend or context
+    console.log("Parameters saved (locally for now):", {
       fridgeMinTemp, fridgeMaxTemp,
       freezerMinTemp, freezerMaxTemp,
       hotHoldMinTemp, hotHoldMaxTemp,
@@ -201,11 +186,10 @@ export default function SettingsPage() {
     });
     toast({
       title: "Parameters Saved",
-      description: "System parameters have been updated.",
+      description: "System parameters have been updated (locally).",
       className: "bg-accent text-accent-foreground"
     });
   };
-
 
   return (
     <div className="flex flex-col min-h-screen">
@@ -223,15 +207,7 @@ export default function SettingsPage() {
 
           <TabsContent value="suppliers">
             <Card>
-              <CardHeader>
-                <div className="flex justify-between items-center">
-                  <div>
-                    <CardTitle>Manage Suppliers</CardTitle>
-                    <CardDescription>Add, edit, or remove suppliers.</CardDescription>
-                  </div>
-                  <Button onClick={() => openDialog("supplier")}><PlusCircle className="mr-2 h-4 w-4" /> Add Supplier</Button>
-                </div>
-              </CardHeader>
+              <CardHeader><div className="flex justify-between items-center"><div><CardTitle>Manage Suppliers</CardTitle><CardDescription>Add, edit, or remove suppliers.</CardDescription></div><Button onClick={() => openDialog("supplier")}><PlusCircle className="mr-2 h-4 w-4" /> Add Supplier</Button></div></CardHeader>
               <CardContent>
                 <Table>
                   <TableHeader><TableRow><TableHead>Name</TableHead><TableHead>Contact Person</TableHead><TableHead>Phone</TableHead><TableHead>Email</TableHead><TableHead className="text-right">Actions</TableHead></TableRow></TableHeader>
@@ -242,7 +218,7 @@ export default function SettingsPage() {
                         <TableCell>{s.phone || 'N/A'}</TableCell><TableCell>{s.email || 'N/A'}</TableCell>
                         <TableCell className="text-right space-x-1">
                           <Button variant="ghost" size="icon" onClick={() => openDialog("supplier", s)}><Edit2 className="h-4 w-4" /></Button>
-                          <Button variant="ghost" size="icon" className="text-destructive hover:text-destructive/80" onClick={() => deleteItem("supplier", s.id)}><Trash2 className="h-4 w-4" /></Button>
+                          <Button variant="ghost" size="icon" className="text-destructive hover:text-destructive/80" onClick={() => handleDeleteItem("supplier", s.id)}><Trash2 className="h-4 w-4" /></Button>
                         </TableCell>
                       </TableRow>
                     ))}
@@ -255,15 +231,7 @@ export default function SettingsPage() {
 
           <TabsContent value="appliances">
             <Card>
-              <CardHeader>
-                <div className="flex justify-between items-center">
-                  <div>
-                  <CardTitle>Manage Appliances</CardTitle>
-                  <CardDescription>Add, edit, or remove appliances used for temperature logging.</CardDescription>
-                  </div>
-                  <Button onClick={() => openDialog("appliance")}><PlusCircle className="mr-2 h-4 w-4" /> Add Appliance</Button>
-                </div>
-              </CardHeader>
+              <CardHeader><div className="flex justify-between items-center"><div><CardTitle>Manage Appliances</CardTitle><CardDescription>Add, edit, or remove appliances used for temperature logging.</CardDescription></div><Button onClick={() => openDialog("appliance")}><PlusCircle className="mr-2 h-4 w-4" /> Add Appliance</Button></div></CardHeader>
               <CardContent>
                  <Table>
                   <TableHeader><TableRow><TableHead>Name</TableHead><TableHead>Location</TableHead><TableHead>Type</TableHead><TableHead>Min Temp (°C)</TableHead><TableHead>Max Temp (°C)</TableHead><TableHead className="text-right">Actions</TableHead></TableRow></TableHeader>
@@ -274,7 +242,7 @@ export default function SettingsPage() {
                         <TableCell>{a.minTemp ?? 'N/A'}</TableCell><TableCell>{a.maxTemp ?? 'N/A'}</TableCell>
                         <TableCell className="text-right space-x-1">
                           <Button variant="ghost" size="icon" onClick={() => openDialog("appliance", a)}><Edit2 className="h-4 w-4" /></Button>
-                          <Button variant="ghost" size="icon" className="text-destructive hover:text-destructive/80" onClick={() => deleteItem("appliance", a.id)}><Trash2 className="h-4 w-4" /></Button>
+                          <Button variant="ghost" size="icon" className="text-destructive hover:text-destructive/80" onClick={() => handleDeleteItem("appliance", a.id)}><Trash2 className="h-4 w-4" /></Button>
                         </TableCell>
                       </TableRow>
                     ))}
@@ -287,31 +255,23 @@ export default function SettingsPage() {
 
           <TabsContent value="cleaning_tasks">
              <Card>
-              <CardHeader>
-                <div className="flex justify-between items-center">
-                  <div>
-                    <CardTitle>Manage Cleaning Tasks</CardTitle>
-                    <CardDescription>Define tasks for the cleaning checklist.</CardDescription>
-                  </div>
-                  <Button onClick={() => openDialog("cleaningTask")}><PlusCircle className="mr-2 h-4 w-4" /> Add Cleaning Task</Button>
-                </div>
-              </CardHeader>
+              <CardHeader><div className="flex justify-between items-center"><div><CardTitle>Manage Cleaning Task Definitions</CardTitle><CardDescription>Define tasks for the cleaning checklist. These are templates.</CardDescription></div><Button onClick={() => openDialog("cleaningTask")}><PlusCircle className="mr-2 h-4 w-4" /> Add Task Definition</Button></div></CardHeader>
               <CardContent>
                  <Table>
                   <TableHeader><TableRow><TableHead>Name</TableHead><TableHead>Area</TableHead><TableHead>Frequency</TableHead><TableHead>Description</TableHead><TableHead className="text-right">Actions</TableHead></TableRow></TableHeader>
                   <TableBody>
-                    {cleaningTasks.map(t => (
+                    {cleaningTasks.map(t => ( // these are CleaningTask definitions
                       <TableRow key={t.id}>
                         <TableCell>{t.name}</TableCell><TableCell>{t.area}</TableCell>
                         <TableCell><Badge variant="secondary">{getFrequencyLabel(t.frequency)}</Badge></TableCell>
                         <TableCell className="max-w-xs truncate">{t.description || 'N/A'}</TableCell>
                         <TableCell className="text-right space-x-1">
                           <Button variant="ghost" size="icon" onClick={() => openDialog("cleaningTask", t)}><Edit2 className="h-4 w-4" /></Button>
-                          <Button variant="ghost" size="icon" className="text-destructive hover:text-destructive/80" onClick={() => deleteItem("cleaningTask", t.id)}><Trash2 className="h-4 w-4" /></Button>
+                          <Button variant="ghost" size="icon" className="text-destructive hover:text-destructive/80" onClick={() => handleDeleteItem("cleaningTask", t.id)}><Trash2 className="h-4 w-4" /></Button>
                         </TableCell>
                       </TableRow>
                     ))}
-                    {cleaningTasks.length === 0 && <TableRow><TableCell colSpan={5} className="text-center">No cleaning tasks configured.</TableCell></TableRow>}
+                    {cleaningTasks.length === 0 && <TableRow><TableCell colSpan={5} className="text-center">No cleaning task definitions configured.</TableCell></TableRow>}
                   </TableBody>
                 </Table>
               </CardContent>
@@ -320,45 +280,20 @@ export default function SettingsPage() {
 
           <TabsContent value="users">
             <Card>
-              <CardHeader>
-                <div className="flex justify-between items-center">
-                  <div>
-                    <CardTitle>Manage Users</CardTitle>
-                    <CardDescription>Add, edit, or remove users and manage their roles.</CardDescription>
-                  </div>
-                  <Button onClick={() => openDialog("user")}><PlusCircle className="mr-2 h-4 w-4" /> Add User</Button>
-                </div>
-              </CardHeader>
+              <CardHeader><div className="flex justify-between items-center"><div><CardTitle>Manage Users</CardTitle><CardDescription>Add, edit, or remove users and manage their roles.</CardDescription></div><Button onClick={() => openDialog("user")}><PlusCircle className="mr-2 h-4 w-4" /> Add User</Button></div></CardHeader>
               <CardContent>
                 <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Name</TableHead>
-                      <TableHead>Email</TableHead>
-                      <TableHead>Role</TableHead>
-                      <TableHead>Training Records</TableHead>
-                      <TableHead className="text-right">Actions</TableHead>
-                    </TableRow>
-                  </TableHeader>
+                  <TableHeader><TableRow><TableHead>Name</TableHead><TableHead>Email</TableHead><TableHead>Role</TableHead><TableHead>Training Records</TableHead><TableHead className="text-right">Actions</TableHead></TableRow></TableHeader>
                   <TableBody>
                     {users.map(user => (
                       <TableRow key={user.id}>
-                        <TableCell>{user.name}</TableCell>
-                        <TableCell>{user.email}</TableCell>
+                        <TableCell>{user.name}</TableCell><TableCell>{user.email}</TableCell>
                         <TableCell><Badge variant={user.role === 'admin' ? "default" : "secondary"}>{user.role.charAt(0).toUpperCase() + user.role.slice(1)}</Badge></TableCell>
                         <TableCell>
                           <Popover>
-                            <PopoverTrigger asChild>
-                              <Button variant="link" className="p-0 h-auto">{user.trainingRecords?.length || 0} record(s)</Button>
-                            </PopoverTrigger>
+                            <PopoverTrigger asChild><Button variant="link" className="p-0 h-auto">{user.trainingRecords?.length || 0} record(s)</Button></PopoverTrigger>
                             <PopoverContent className="w-80">
-                              <div className="grid gap-4">
-                                <div className="space-y-2">
-                                  <h4 className="font-medium leading-none">Training Records</h4>
-                                  <p className="text-sm text-muted-foreground">
-                                    Details of training completed by {user.name}.
-                                  </p>
-                                </div>
+                              <div className="grid gap-4"><div className="space-y-2"><h4 className="font-medium leading-none">Training Records</h4><p className="text-sm text-muted-foreground">Details of training completed by {user.name}.</p></div>
                                 {user.trainingRecords && user.trainingRecords.length > 0 ? (
                                   <ul className="list-disc pl-5 space-y-1 text-sm">
                                     {user.trainingRecords.map((record, idx) => (
@@ -367,19 +302,16 @@ export default function SettingsPage() {
                                         <br />Completed: {record.dateCompleted ? format(parse(record.dateCompleted, 'yyyy-MM-dd', new Date()), 'PP') : 'N/A'}
                                         {record.expiryDate && (<><br />Expires: {format(parse(record.expiryDate, 'yyyy-MM-dd', new Date()), 'PP')}</>)}
                                         {record.certificateUrl && (<><br /><a href={record.certificateUrl} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">View Certificate</a></>)}
-                                      </li>
-                                    ))}
+                                      </li>))}
                                   </ul>
-                                ) : (
-                                  <p className="text-sm text-muted-foreground">No training records found.</p>
-                                )}
+                                ) : (<p className="text-sm text-muted-foreground">No training records found.</p>)}
                               </div>
                             </PopoverContent>
                           </Popover>
                         </TableCell>
                         <TableCell className="text-right space-x-1">
                           <Button variant="ghost" size="icon" onClick={() => openDialog("user", user)}><Edit2 className="h-4 w-4" /></Button>
-                          <Button variant="ghost" size="icon" className="text-destructive hover:text-destructive/80" onClick={() => deleteItem("user", user.id)}><Trash2 className="h-4 w-4" /></Button>
+                          <Button variant="ghost" size="icon" className="text-destructive hover:text-destructive/80" onClick={() => handleDeleteItem("user", user.id)}><Trash2 className="h-4 w-4" /></Button>
                         </TableCell>
                       </TableRow>
                     ))}
@@ -392,72 +324,31 @@ export default function SettingsPage() {
           
           <TabsContent value="parameters">
             <Card>
-              <CardHeader>
-                <CardTitle>System Parameters</CardTitle>
-                <CardDescription>Configure general application settings and thresholds.</CardDescription>
-              </CardHeader>
+              <CardHeader><CardTitle>System Parameters</CardTitle><CardDescription>Configure general application settings and thresholds.</CardDescription></CardHeader>
               <CardContent className="space-y-8">
-                <section>
-                  <h3 className="text-lg font-semibold mb-3">Default Temperature Ranges (°C)</h3>
+                <section><h3 className="text-lg font-semibold mb-3">Default Temperature Ranges (°C)</h3>
                   <div className="space-y-4">
-                    <Card className="p-4">
-                      <CardTitle className="text-base mb-2">Fridge</CardTitle>
-                      <div className="grid grid-cols-2 gap-4">
-                        <div><Label htmlFor="fridgeMin">Min Temperature</Label><Input id="fridgeMin" type="number" value={fridgeMinTemp} onChange={(e) => setFridgeMinTemp(e.target.value)} /></div>
-                        <div><Label htmlFor="fridgeMax">Max Temperature</Label><Input id="fridgeMax" type="number" value={fridgeMaxTemp} onChange={(e) => setFridgeMaxTemp(e.target.value)} /></div>
-                      </div>
-                    </Card>
-                     <Card className="p-4">
-                      <CardTitle className="text-base mb-2">Freezer</CardTitle>
-                      <div className="grid grid-cols-2 gap-4">
-                        <div><Label htmlFor="freezerMin">Min Temperature</Label><Input id="freezerMin" type="number" value={freezerMinTemp} onChange={(e) => setFreezerMinTemp(e.target.value)} /></div>
-                        <div><Label htmlFor="freezerMax">Max Temperature</Label><Input id="freezerMax" type="number" value={freezerMaxTemp} onChange={(e) => setFreezerMaxTemp(e.target.value)} /></div>
-                      </div>
-                    </Card>
-                     <Card className="p-4">
-                      <CardTitle className="text-base mb-2">Hot Holding</CardTitle>
-                      <div className="grid grid-cols-2 gap-4">
-                        <div><Label htmlFor="hotHoldMin">Min Temperature</Label><Input id="hotHoldMin" type="number" value={hotHoldMinTemp} onChange={(e) => setHotHoldMinTemp(e.target.value)} /></div>
-                        <div><Label htmlFor="hotHoldMax">Max Temperature</Label><Input id="hotHoldMax" type="number" value={hotHoldMaxTemp} onChange={(e) => setHotHoldMaxTemp(e.target.value)} /></div>
-                      </div>
-                    </Card>
+                    <Card className="p-4"><CardTitle className="text-base mb-2">Fridge</CardTitle><div className="grid grid-cols-2 gap-4"><div><Label htmlFor="fridgeMin">Min Temperature</Label><Input id="fridgeMin" type="number" value={fridgeMinTemp} onChange={(e) => setFridgeMinTemp(e.target.value)} /></div><div><Label htmlFor="fridgeMax">Max Temperature</Label><Input id="fridgeMax" type="number" value={fridgeMaxTemp} onChange={(e) => setFridgeMaxTemp(e.target.value)} /></div></div></Card>
+                    <Card className="p-4"><CardTitle className="text-base mb-2">Freezer</CardTitle><div className="grid grid-cols-2 gap-4"><div><Label htmlFor="freezerMin">Min Temperature</Label><Input id="freezerMin" type="number" value={freezerMinTemp} onChange={(e) => setFreezerMinTemp(e.target.value)} /></div><div><Label htmlFor="freezerMax">Max Temperature</Label><Input id="freezerMax" type="number" value={freezerMaxTemp} onChange={(e) => setFreezerMaxTemp(e.target.value)} /></div></div></Card>
+                    <Card className="p-4"><CardTitle className="text-base mb-2">Hot Holding</CardTitle><div className="grid grid-cols-2 gap-4"><div><Label htmlFor="hotHoldMin">Min Temperature</Label><Input id="hotHoldMin" type="number" value={hotHoldMinTemp} onChange={(e) => setHotHoldMinTemp(e.target.value)} /></div><div><Label htmlFor="hotHoldMax">Max Temperature</Label><Input id="hotHoldMax" type="number" value={hotHoldMaxTemp} onChange={(e) => setHotHoldMaxTemp(e.target.value)} /></div></div></Card>
                   </div>
                 </section>
-
                 <Separator />
-
-                <section>
-                  <h3 className="text-lg font-semibold mb-3">Alert Notification Settings</h3>
+                <section><h3 className="text-lg font-semibold mb-3">Alert Notification Settings</h3>
                   <div className="space-y-4">
-                    <div className="flex items-center justify-between p-4 border rounded-lg">
-                      <div>
-                        <Label htmlFor="emailAlerts" className="font-medium">Email Notifications</Label>
-                        <p className="text-sm text-muted-foreground">Receive alerts via email for critical issues.</p>
-                      </div>
-                      <Switch id="emailAlerts" checked={emailAlerts} onCheckedChange={setEmailAlerts} />
-                    </div>
-                    <div className="flex items-center justify-between p-4 border rounded-lg">
-                       <div>
-                        <Label htmlFor="smsAlerts" className="font-medium">SMS Notifications</Label>
-                        <p className="text-sm text-muted-foreground">Receive alerts via SMS (if configured).</p>
-                      </div>
-                      <Switch id="smsAlerts" checked={smsAlerts} onCheckedChange={setSmsAlerts} />
-                    </div>
+                    <div className="flex items-center justify-between p-4 border rounded-lg"><div><Label htmlFor="emailAlerts" className="font-medium">Email Notifications</Label><p className="text-sm text-muted-foreground">Receive alerts via email for critical issues.</p></div><Switch id="emailAlerts" checked={emailAlerts} onCheckedChange={setEmailAlerts} /></div>
+                    <div className="flex items-center justify-between p-4 border rounded-lg"><div><Label htmlFor="smsAlerts" className="font-medium">SMS Notifications</Label><p className="text-sm text-muted-foreground">Receive alerts via SMS (if configured).</p></div><Switch id="smsAlerts" checked={smsAlerts} onCheckedChange={setSmsAlerts} /></div>
                   </div>
                 </section>
               </CardContent>
-              <CardFooter className="border-t pt-6">
-                <Button onClick={handleSaveParameters}><Save className="mr-2 h-4 w-4" /> Save Parameters</Button>
-              </CardFooter>
+              <CardFooter className="border-t pt-6"><Button onClick={handleSaveParameters}><Save className="mr-2 h-4 w-4" /> Save Parameters</Button></CardFooter>
             </Card>
           </TabsContent>
         </Tabs>
 
         <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
           <DialogContent className="sm:max-w-lg">
-            <DialogHeader>
-              <DialogTitle>{editingItem ? "Edit" : "Add New"} {currentForm?.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase())}</DialogTitle>
-            </DialogHeader>
+            <DialogHeader><DialogTitle>{editingItem ? "Edit" : "Add New"} {currentForm?.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase())}</DialogTitle></DialogHeader>
             <div className="py-4 max-h-[70vh] overflow-y-auto pr-2">
             {currentForm === "supplier" && (
               <form onSubmit={supplierForm.handleSubmit(handleSupplierSubmit)} className="space-y-4">
@@ -480,17 +371,13 @@ export default function SettingsPage() {
                 <DialogFooter><Button type="button" variant="outline" onClick={() => setDialogOpen(false)}>Cancel</Button><Button type="submit">Save</Button></DialogFooter>
               </form>
             )}
-            {currentForm === "cleaningTask" && (
+            {currentForm === "cleaningTask" && ( // This form is for CleaningTask Definitions
               <form onSubmit={cleaningTaskForm.handleSubmit(handleCleaningTaskSubmit)} className="space-y-4">
                 <Controller name="name" control={cleaningTaskForm.control} render={({ field, fieldState }) => (<div><Label htmlFor="ct_name">Task Name</Label><Input id="ct_name" {...field} /> {fieldState.error && <p className="text-sm text-destructive">{fieldState.error.message}</p>}</div>)} />
                 <Controller name="area" control={cleaningTaskForm.control} render={({ field, fieldState }) => (<div><Label htmlFor="ct_area">Area</Label><Input id="ct_area" {...field} /> {fieldState.error && <p className="text-sm text-destructive">{fieldState.error.message}</p>}</div>)} />
-                <Controller
-                  name="frequency"
-                  control={cleaningTaskForm.control}
-                  render={({ field, fieldState }) => (
-                    <div>
-                      <Label htmlFor="ct_frequency">Frequency</Label>
-                      <Select onValueChange={field.onChange} defaultValue={field.value}>
+                <Controller name="frequency" control={cleaningTaskForm.control} render={({ field, fieldState }) => (
+                    <div><Label htmlFor="ct_frequency">Frequency</Label>
+                      <Select onValueChange={field.onChange} value={field.value} defaultValue={field.value}>
                         <SelectTrigger id="ct_frequency"><SelectValue /></SelectTrigger>
                         <SelectContent>
                           <SelectItem value="daily">Daily</SelectItem><SelectItem value="weekly">Weekly</SelectItem>
@@ -498,11 +385,9 @@ export default function SettingsPage() {
                         </SelectContent>
                       </Select>
                       {fieldState.error && <p className="text-sm text-destructive">{fieldState.error.message}</p>}
-                    </div>
-                  )}
-                />
+                    </div>)} />
                 <Controller name="description" control={cleaningTaskForm.control} render={({ field }) => (<div><Label htmlFor="ct_desc">Description</Label><Textarea id="ct_desc" {...field} /></div>)} />
-                <DialogFooter><Button type="button" variant="outline" onClick={() => setDialogOpen(false)}>Cancel</Button><Button type="submit">Save</Button></DialogFooter>
+                <DialogFooter><Button type="button" variant="outline" onClick={() => setDialogOpen(false)}>Cancel</Button><Button type="submit">Save Task Definition</Button></DialogFooter>
               </form>
             )}
             {currentForm === "user" && (
@@ -510,25 +395,18 @@ export default function SettingsPage() {
                 <Controller name="name" control={userForm.control} render={({ field, fieldState }) => (<div><Label htmlFor="u_name">Name</Label><Input id="u_name" {...field} />{fieldState.error && <p className="text-sm text-destructive">{fieldState.error.message}</p>}</div>)} />
                 <Controller name="email" control={userForm.control} render={({ field, fieldState }) => (<div><Label htmlFor="u_email">Email</Label><Input id="u_email" type="email" {...field} />{fieldState.error && <p className="text-sm text-destructive">{fieldState.error.message}</p>}</div>)} />
                 <Controller name="role" control={userForm.control} render={({ field, fieldState }) => (
-                  <div>
-                    <Label htmlFor="u_role">Role</Label>
-                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                  <div><Label htmlFor="u_role">Role</Label>
+                    <Select onValueChange={field.onChange} value={field.value} defaultValue={field.value}>
                       <SelectTrigger id="u_role"><SelectValue /></SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="admin">Admin</SelectItem>
-                        <SelectItem value="staff">Staff</SelectItem>
-                      </SelectContent>
+                      <SelectContent><SelectItem value="admin">Admin</SelectItem><SelectItem value="staff">Staff</SelectItem></SelectContent>
                     </Select>
                     {fieldState.error && <p className="text-sm text-destructive">{fieldState.error.message}</p>}
-                  </div>
-                )} />
+                  </div>)} />
                 <Controller name="trainingRecords" control={userForm.control} render={({ field }) => (
-                  <div>
-                    <Label htmlFor="u_training">Training Records</Label>
+                  <div><Label htmlFor="u_training">Training Records</Label>
                     <Textarea id="u_training" {...field} rows={4} placeholder="Enter one record per line: Name;DateCompleted (YYYY-MM-DD);ExpiryDate (YYYY-MM-DD);CertificateURL" />
                     <p className="text-xs text-muted-foreground mt-1">Format: Name;YYYY-MM-DD;YYYY-MM-DD (optional);URL (optional)</p>
-                  </div>
-                )} />
+                  </div>)} />
                 <DialogFooter><Button type="button" variant="outline" onClick={() => setDialogOpen(false)}>Cancel</Button><Button type="submit">Save User</Button></DialogFooter>
               </form>
             )}
