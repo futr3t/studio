@@ -16,6 +16,8 @@ import { useToast } from "@/hooks/use-toast";
 import { DateRange } from 'react-day-picker';
 import { useData } from '@/context/DataContext';
 import type { ProductionLog, DeliveryLog, TemperatureLog, CleaningChecklistItem, Supplier, Appliance, User } from '@/lib/types';
+import jsPDF from 'jspdf';
+import 'jspdf-autotable';
 
 interface ReportData {
   reportTitle: string;
@@ -29,6 +31,11 @@ interface ReportSection {
   columns: string[];
   data: any[][];
   emptyMessage: string;
+}
+
+// Extend jsPDF with autoTable - required for TypeScript
+interface jsPDFWithAutoTable extends jsPDF {
+  autoTable: (options: any) => jsPDFWithAutoTable;
 }
 
 export default function ReportsPage() {
@@ -75,7 +82,6 @@ export default function ReportsPage() {
     const to = endOfDay(generalReportDateRange.to);
     const interval = { start: from, end: to };
 
-    // Filter Production Logs
     const filteredProductionLogs = productionLogs.filter(log => isWithinInterval(parseISO(log.logTime), interval));
     const productionReportData = filteredProductionLogs.map(log => [
       log.productName,
@@ -87,7 +93,6 @@ export default function ReportsPage() {
       getUserName(log.verifiedBy)
     ]);
 
-    // Filter Delivery Logs
     const filteredDeliveryLogs = deliveryLogs.filter(log => isWithinInterval(parseISO(log.deliveryTime), interval));
     const deliveryReportData = filteredDeliveryLogs.map(log => [
       format(parseISO(log.deliveryTime), "PPpp", { locale: enUS }),
@@ -99,7 +104,6 @@ export default function ReportsPage() {
       log.vehicleReg || "N/A",
     ]);
     
-    // Filter Temperature Logs
     const filteredTemperatureLogs = temperatureLogs.filter(log => isWithinInterval(parseISO(log.logTime), interval));
     const temperatureReportData = filteredTemperatureLogs.map(log => [
       getApplianceName(log.applianceId),
@@ -107,10 +111,9 @@ export default function ReportsPage() {
       format(parseISO(log.logTime), "PPpp", { locale: enUS }),
       log.isCompliant ? "Compliant" : "Non-Compliant",
       log.correctiveAction || "N/A",
-      log.loggedBy || "N/A",
+      getUserName(log.loggedBy),
     ]);
 
-    // Filter Cleaning Checklist Items (Completed)
     const filteredCleaningItems = cleaningChecklistItems.filter(item => 
       item.completed && item.completedAt && isWithinInterval(parseISO(item.completedAt), interval)
     );
@@ -130,38 +133,82 @@ export default function ReportsPage() {
       sections: [
         {
           title: "Production Logs",
-          columns: ["Product Name", "Batch Code", "Log Time", "Critical Limit", "Status", "Corrective Action", "Verified By"],
+          columns: ["Product", "Batch", "Time", "Limit", "Status", "Correction", "Verified By"],
           data: productionReportData,
           emptyMessage: "No production logs found for this period."
         },
         {
           title: "Delivery Logs",
-          columns: ["Delivery Time", "Supplier", "Items", "Status", "Corrective Action", "Received By", "Vehicle Reg."],
+          columns: ["Time", "Supplier", "Items", "Status", "Correction", "Received By", "Vehicle"],
           data: deliveryReportData,
           emptyMessage: "No delivery logs found for this period."
         },
         {
           title: "Temperature Logs",
-          columns: ["Appliance", "Temperature", "Log Time", "Status", "Corrective Action", "Logged By"],
+          columns: ["Appliance", "Temp", "Time", "Status", "Correction", "Logged By"],
           data: temperatureReportData,
           emptyMessage: "No temperature logs found for this period."
         },
         {
           title: "Completed Cleaning Tasks",
-          columns: ["Task Name", "Area", "Frequency", "Completed At", "Completed By", "Notes"],
+          columns: ["Task", "Area", "Freq", "Completed", "By", "Notes"],
           data: cleaningReportData,
           emptyMessage: "No completed cleaning tasks found for this period."
         }
       ]
     };
 
-    console.log("Generating General Report Data:", reportData);
+    const doc = new jsPDF() as jsPDFWithAutoTable;
+    let yPos = 15;
+
+    doc.setFontSize(18);
+    doc.text(reportData.reportTitle, 14, yPos);
+    yPos += 8;
+
+    doc.setFontSize(10);
+    doc.text(`Date Range: ${reportData.dateRangeFormatted}`, 14, yPos);
+    yPos += 5;
+    doc.text(`Generated At: ${reportData.generatedAt}`, 14, yPos);
+    yPos += 10;
+
+    reportData.sections.forEach(section => {
+      if (yPos > 260) { // Add new page if content is near bottom
+        doc.addPage();
+        yPos = 15;
+      }
+      doc.setFontSize(14);
+      doc.text(section.title, 14, yPos);
+      yPos += 6;
+
+      if (section.data.length > 0) {
+        doc.autoTable({
+          head: [section.columns],
+          body: section.data,
+          startY: yPos,
+          theme: 'striped',
+          headStyles: { fillColor: [59, 130, 246] }, // Tailwind primary blue
+          margin: { top: 10 },
+          didDrawPage: (data) => { // Update yPos after table is drawn
+             yPos = data.cursor?.y ?? yPos;
+          }
+        });
+        yPos = (doc.previousAutoTable as any)?.finalY ? (doc.previousAutoTable as any).finalY + 10 : yPos + 10; // Get final Y pos of table
+      } else {
+        doc.setFontSize(10);
+        doc.text(section.emptyMessage, 14, yPos);
+        yPos += 7;
+      }
+      yPos += 5; // Add some space between sections
+    });
+    
+    const fileName = `General_Compliance_Report_${format(new Date(), "yyyy-MM-dd", { locale: enUS })}.pdf`;
+    doc.save(fileName);
+
     toast({
-      title: "General Report Data Prepared",
-      description: `Data for ${reportData.dateRangeFormatted} has been prepared and logged to console.`,
+      title: "General Report Generated",
+      description: `${fileName} has been downloaded.`,
       className: "bg-accent text-accent-foreground"
     });
-    // Actual PDF generation logic would go here using reportData
   };
 
   const handleGenerateNonCompliantReport = () => {
