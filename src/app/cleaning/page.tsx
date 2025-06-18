@@ -12,7 +12,6 @@ import { Badge } from "@/components/ui/badge";
 import { CleaningChecklistItem, CleaningFrequency, User } from "@/lib/types";
 import { mockCleaningChecklist, mockUsers } from "@/lib/data";
 import { format, formatISO, parseISO } from 'date-fns';
-import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import {
   Dialog,
@@ -31,11 +30,6 @@ import { cn } from '@/lib/utils';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 
-interface CompletionFormData {
-  completedBy: string;
-  notes?: string;
-}
-
 // Assume the first user is the currently logged-in user for this example
 const currentUser: User | undefined = mockUsers[0];
 
@@ -44,7 +38,7 @@ export default function CleaningPage() {
   const [filteredChecklist, setFilteredChecklist] = useState<CleaningChecklistItem[]>(mockCleaningChecklist);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [currentItem, setCurrentItem] = useState<CleaningChecklistItem | null>(null);
-  const [completedBy, setCompletedBy] = useState(currentUser?.name || '');
+  const [completedBy, setCompletedBy] = useState(currentUser?.id || ''); // Store user ID
   const [completionNotes, setCompletionNotes] = useState('');
   const { toast } = useToast();
 
@@ -65,7 +59,7 @@ export default function CleaningPage() {
     }
     if (filterDate) {
        items = items.filter(item => {
-        if (!item.completedAt) return filterStatus === 'pending'; 
+        if (!item.completedAt) return filterStatus === 'pending';
         return format(parseISO(item.completedAt), 'yyyy-MM-dd') === format(filterDate, 'yyyy-MM-dd');
       });
     }
@@ -77,33 +71,38 @@ export default function CleaningPage() {
     const item = checklist.find(i => i.id === itemId);
     if (!item) return;
 
-    if (completed) { 
+    if (completed) {
       setCurrentItem(item);
-      setCompletedBy(currentUser?.name || item.completedBy || ""); // Pre-fill with current user or existing
-      setCompletionNotes(item.notes || "");
+      setCompletedBy(currentUser?.id || ''); // Default to current user's ID
+      setCompletionNotes(''); // Reset notes for new completion
       setIsDialogOpen(true);
-    } else { 
+    } else {
       setChecklist(prev => prev.map(i => i.id === itemId ? { ...i, completed: false, completedAt: undefined, completedBy: undefined, notes: undefined } : i));
       toast({ title: "Task Incomplete", description: `${item.name} marked as pending.` });
     }
   };
 
   const handleSaveCompletion = () => {
-    if (!currentItem) return;
-    setChecklist(prev => prev.map(i => i.id === currentItem.id ? { 
-      ...i, 
-      completed: true, 
-      completedAt: formatISO(new Date()), 
-      completedBy: completedBy,
+    if (!currentItem || !completedBy) return;
+    const completingUser = mockUsers.find(u => u.id === completedBy);
+    if (!completingUser) {
+        toast({ title: "Error", description: "Selected user not found.", variant: "destructive" });
+        return;
+    }
+
+    setChecklist(prev => prev.map(i => i.id === currentItem.id ? {
+      ...i,
+      completed: true,
+      completedAt: formatISO(new Date()),
+      completedBy: completingUser.name, // Save user's name
       notes: completionNotes
     } : i));
-    toast({ title: "Task Completed!", description: `${currentItem.name} marked as complete.`, className: "bg-accent text-accent-foreground" });
+    toast({ title: "Task Completed!", description: `${currentItem.name} marked as complete by ${completingUser.name}.`, className: "bg-accent text-accent-foreground" });
     setIsDialogOpen(false);
     setCurrentItem(null);
-    // Reset notes, completedBy will be pre-filled next time
-    setCompletionNotes(''); 
+    setCompletionNotes('');
   };
-  
+
   const getFrequencyLabel = (freq: CleaningFrequency) => {
     const labels: Record<CleaningFrequency, string> = {
       daily: 'Daily',
@@ -226,7 +225,18 @@ export default function CleaningPage() {
           </CardContent>
         </Card>
 
-        <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+        <Dialog open={isDialogOpen} onOpenChange={(isOpen) => {
+            setIsDialogOpen(isOpen);
+            if (!isOpen) {
+                setCurrentItem(null);
+                // If dialog is closed without saving, and an item was selected, revert its checkbox state
+                if(currentItem && !checklist.find(i => i.id === currentItem.id)?.completed) {
+                   // This logic might be tricky if the user unchecks then closes.
+                   // For now, let's assume cancel means revert the intent to complete.
+                   setChecklist(prev => prev.map(i => i.id === currentItem?.id ? { ...i, completed: false } : i));
+                }
+            }
+        }}>
             <DialogContent>
                 <DialogHeader>
                     <DialogTitle>Confirm Task Completion: {currentItem?.name}</DialogTitle>
@@ -235,13 +245,16 @@ export default function CleaningPage() {
                 <div className="space-y-4 py-4">
                     <div>
                         <Label htmlFor="completedBy">Completed By</Label>
-                        <Input 
-                            id="completedBy" 
-                            value={completedBy} 
-                            onChange={(e) => setCompletedBy(e.target.value)} 
-                            placeholder="Your name"
-                            readOnly // Made read-only as it's pre-filled
-                        />
+                        <Select value={completedBy} onValueChange={setCompletedBy}>
+                            <SelectTrigger id="completedBy">
+                                <SelectValue placeholder="Select user" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                {mockUsers.map(user => (
+                                    <SelectItem key={user.id} value={user.id}>{user.name}</SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
                     </div>
                     <div>
                         <Label htmlFor="completionNotes">Notes (Optional)</Label>
@@ -251,10 +264,11 @@ export default function CleaningPage() {
                 <DialogFooter>
                     <Button variant="outline" onClick={() => {
                         setIsDialogOpen(false);
-                        setCurrentItem(null);
+                        // If currentItem exists and was intended to be marked complete, revert its state
                         if(currentItem) {
                            setChecklist(prev => prev.map(i => i.id === currentItem.id ? { ...i, completed: false } : i));
                         }
+                        setCurrentItem(null);
                     }}>Cancel</Button>
                     <Button onClick={handleSaveCompletion} disabled={!completedBy.trim()}>Save Completion</Button>
                 </DialogFooter>
@@ -264,5 +278,3 @@ export default function CleaningPage() {
     </div>
   );
 }
-
-    
