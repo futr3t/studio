@@ -1,6 +1,6 @@
 
 import type { Supplier, Appliance, ProductionLog, DeliveryLog, TemperatureLog, CleaningTask, CleaningChecklistItem, User, TrainingRecord } from './types';
-import { formatISO, addYears, subHours, subMinutes, subDays, subYears } from 'date-fns';
+import { formatISO, addYears, subHours, subMinutes, subDays } from 'date-fns';
 
 // Define some static base dates for consistency
 export const STATIC_NOW = new Date(2024, 5, 18, 14, 30, 0); // June 18, 2024, 14:30:00 (Month is 0-indexed)
@@ -25,8 +25,8 @@ export const mockUsersData: User[] = [
     email: 'alice@chefcheck.com',
     role: 'admin',
     trainingRecords: [
-      { name: 'Food Safety Level 3', dateCompleted: formatISO(subYears(STATIC_NOW, 1), { representation: 'date' }), expiryDate: formatISO(addYears(STATIC_NOW, 2), { representation: 'date' }), certificateUrl: 'https://example.com/cert/alice1.pdf' },
-      { name: 'HACCP Principles', dateCompleted: formatISO(subYears(STATIC_NOW, 1), { representation: 'date' }) },
+      { name: 'Food Safety Level 3', dateCompleted: formatISO(subDays(STATIC_NOW, 365), { representation: 'date' }), expiryDate: formatISO(addYears(STATIC_NOW, 2), { representation: 'date' }), certificateUrl: 'https://example.com/cert/alice1.pdf' },
+      { name: 'HACCP Principles', dateCompleted: formatISO(subDays(STATIC_NOW, 300), { representation: 'date' }) },
     ],
   },
   {
@@ -35,7 +35,7 @@ export const mockUsersData: User[] = [
     email: 'bob@chefcheck.com',
     role: 'staff',
     trainingRecords: [
-      { name: 'Food Safety Level 2', dateCompleted: formatISO(subYears(new Date(2023, 4, 15),0), { representation: 'date' }), expiryDate: formatISO(addYears(new Date(2023, 4, 15),3), { representation: 'date' }) }, // May 15, 2023
+      { name: 'Food Safety Level 2', dateCompleted: formatISO(subDays(new Date(2023, 4, 15),0), { representation: 'date' }), expiryDate: formatISO(addYears(new Date(2023, 4, 15),3), { representation: 'date' }) }, // May 15, 2023
     ],
   },
   {

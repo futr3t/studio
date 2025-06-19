@@ -7,10 +7,10 @@ import type {
   CleaningTask, CleaningChecklistItem, User, ActivityFeedItem, SystemParameters, TemperatureRange, DataContextType
 } from '@/lib/types';
 import {
-  mockSuppliersData, mockAppliancesData, mockProductionLogsData,
+  mockAppliancesData, mockProductionLogsData,
   mockDeliveryLogsData, mockTemperatureLogsData, mockCleaningTasksData,
   mockCleaningChecklistItemsData, mockUsersData, STATIC_NOW
-} from '@/lib/data';
+} from '@/lib/data'; // mockSuppliersData removed from here
 import { CheckCircle2, AlertTriangle, ClipboardList, Thermometer, Sparkles, Truck, Factory } from 'lucide-react';
 import { useToast } from "@/hooks/use-toast";
 
@@ -29,7 +29,7 @@ const initialSystemParameters: SystemParameters = {
 const DataContext = createContext<DataContextType | undefined>(undefined);
 
 export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-  const [suppliers, setSuppliers] = useState<Supplier[]>(mockSuppliersData);
+  const [suppliers, setSuppliers] = useState<Supplier[]>([]); // Initialize as empty
   const [appliances, setAppliances] = useState<Appliance[]>(mockAppliancesData);
   const [productionLogs, setProductionLogs] = useState<ProductionLog[]>(mockProductionLogsData);
   const [deliveryLogs, setDeliveryLogs] = useState<DeliveryLog[]>(mockDeliveryLogsData);
@@ -41,12 +41,25 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const [currentUser, setCurrentUserInternal] = useState<User | null>(null);
   const { toast } = useToast();
 
+  const fetchSuppliers = useCallback(async () => {
+    try {
+      const response = await fetch('/api/suppliers');
+      if (!response.ok) {
+        throw new Error('Failed to fetch suppliers');
+      }
+      const data: Supplier[] = await response.json();
+      setSuppliers(data);
+    } catch (error) {
+      console.error("Error loading suppliers:", error);
+      toast({ title: "Error", description: "Could not load suppliers.", variant: "destructive" });
+    }
+  }, [toast]);
+
   useEffect(() => {
-    // Set a default current user (e.g., the first admin user)
-    // In a real app, this would come from an authentication service
+    fetchSuppliers();
     const initialUser = mockUsersData.find(u => u.role === 'admin') || mockUsersData[0] || null;
     setCurrentUserInternal(initialUser);
-  }, []);
+  }, [fetchSuppliers]);
 
 
   const setCurrentUser = (user: User | null) => {
@@ -78,19 +91,62 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     return null;
   }, [systemParameters.temperatureRanges]);
 
-  const addSupplier = (supplierData: Omit<Supplier, 'id'>) => {
-    const newSupplier = { ...supplierData, id: `sup${Date.now()}` };
-    setSuppliers(prev => [newSupplier, ...prev]);
-    toast({ title: "Supplier Added", description: `${newSupplier.name} has been added.`, className: "bg-accent text-accent-foreground" });
+  const addSupplier = async (supplierData: Omit<Supplier, 'id'>) => {
+    try {
+      const response = await fetch('/api/suppliers', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(supplierData),
+      });
+      if (!response.ok) {
+        throw new Error('Failed to add supplier');
+      }
+      const newSupplier: Supplier = await response.json();
+      setSuppliers(prev => [newSupplier, ...prev]); // Optimistic update or re-fetch
+      toast({ title: "Supplier Added", description: `${newSupplier.name} has been added.`, className: "bg-accent text-accent-foreground" });
+      await fetchSuppliers(); // Re-fetch to ensure consistency if API modifies data
+    } catch (error) {
+      console.error("Error adding supplier:", error);
+      toast({ title: "Error", description: "Could not add supplier.", variant: "destructive" });
+    }
   };
-  const updateSupplier = (updatedSupplier: Supplier) => {
-    setSuppliers(prev => prev.map(s => s.id === updatedSupplier.id ? updatedSupplier : s));
-    toast({ title: "Supplier Updated", description: `${updatedSupplier.name} has been updated.`, className: "bg-accent text-accent-foreground" });
+
+  const updateSupplier = async (updatedSupplier: Supplier) => {
+    try {
+      const response = await fetch(`/api/suppliers/${updatedSupplier.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(updatedSupplier),
+      });
+      if (!response.ok) {
+        throw new Error('Failed to update supplier');
+      }
+      const returnedSupplier: Supplier = await response.json();
+      setSuppliers(prev => prev.map(s => s.id === returnedSupplier.id ? returnedSupplier : s));
+      toast({ title: "Supplier Updated", description: `${returnedSupplier.name} has been updated.`, className: "bg-accent text-accent-foreground" });
+      await fetchSuppliers(); 
+    } catch (error) {
+      console.error("Error updating supplier:", error);
+      toast({ title: "Error", description: "Could not update supplier.", variant: "destructive" });
+    }
   };
-  const deleteSupplier = (supplierId: string) => {
-    const name = suppliers.find(s => s.id === supplierId)?.name || 'Supplier';
-    setSuppliers(prev => prev.filter(s => s.id !== supplierId));
-    toast({ title: "Supplier Deleted", description: `${name} has been removed.`, variant: "destructive" });
+
+  const deleteSupplier = async (supplierId: string) => {
+    const supplierToDelete = suppliers.find(s => s.id === supplierId);
+    try {
+      const response = await fetch(`/api/suppliers/${supplierId}`, {
+        method: 'DELETE',
+      });
+      if (!response.ok) {
+        throw new Error('Failed to delete supplier');
+      }
+      setSuppliers(prev => prev.filter(s => s.id !== supplierId));
+      toast({ title: "Supplier Deleted", description: `${supplierToDelete?.name || 'Supplier'} has been removed.`, variant: "destructive" });
+      // No need to re-fetch if API confirms deletion and we filter locally
+    } catch (error) {
+      console.error("Error deleting supplier:", error);
+      toast({ title: "Error", description: "Could not delete supplier.", variant: "destructive" });
+    }
   };
 
   const addAppliance = (applianceData: Omit<Appliance, 'id'>) => {
@@ -288,3 +344,4 @@ export const useData = (): DataContextType => {
   }
   return context;
 };
+
