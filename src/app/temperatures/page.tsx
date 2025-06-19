@@ -11,7 +11,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Thermometer, Edit2, Trash2, AlertCircle } from "lucide-react";
-import { Appliance, TemperatureLog } from "@/lib/types";
+import type { Appliance, TemperatureLog, TemperatureRange } from "@/lib/types";
 import { format, parseISO } from 'date-fns';
 import { enUS } from 'date-fns/locale';
 import {
@@ -40,7 +40,16 @@ const temperatureLogSchema = z.object({
 type TemperatureLogFormData = z.infer<typeof temperatureLogSchema>;
 
 export default function TemperaturesPage() {
-  const { temperatureLogs, appliances, users, findUserById, addTemperatureLog, updateTemperatureLog, deleteTemperatureLog: deleteLogFromContext } = useData();
+  const { 
+    temperatureLogs, 
+    appliances, 
+    users, 
+    findUserById, 
+    addTemperatureLog, 
+    updateTemperatureLog, 
+    deleteTemperatureLog: deleteLogFromContext,
+    getApplianceEffectiveTempRange
+  } = useData();
   const { toast } = useToast();
 
   const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -49,24 +58,31 @@ export default function TemperaturesPage() {
 
   const { control, handleSubmit, reset, watch, setValue } = useForm<TemperatureLogFormData>({
     resolver: zodResolver(temperatureLogSchema),
-    defaultValues: { temperature: undefined, correctiveAction: "", loggedBy: "" }, // Empty string for placeholder
+    defaultValues: { temperature: undefined, correctiveAction: "", loggedBy: "" }, 
   });
 
   const currentTemperature = watch("temperature");
   
+  const effectiveTempRangeForSelectedAppliance = useMemo(() => {
+    if (!selectedAppliance) return null;
+    return getApplianceEffectiveTempRange(selectedAppliance);
+  }, [selectedAppliance, getApplianceEffectiveTempRange]);
+
   const isCurrentLogCompliant = useMemo(() => {
-    if (selectedAppliance && typeof currentTemperature === 'number') {
-      const { minTemp, maxTemp } = selectedAppliance;
-      if (typeof minTemp === 'number' && currentTemperature < minTemp) return false;
-      if (typeof maxTemp === 'number' && currentTemperature > maxTemp) return false;
+    if (!selectedAppliance || typeof currentTemperature !== 'number') return true; // Compliant if no temp or appliance
+    const range = effectiveTempRangeForSelectedAppliance;
+    if (range) {
+      if (currentTemperature < range.min) return false;
+      if (currentTemperature > range.max) return false;
     }
-    return true;
-  }, [currentTemperature, selectedAppliance]);
+    return true; // Compliant if no specific range defined or if within range
+  }, [currentTemperature, selectedAppliance, effectiveTempRangeForSelectedAppliance]);
+
 
   const openLogDialog = (appliance: Appliance) => {
     setSelectedAppliance(appliance);
     setEditingLog(null);
-    reset({ temperature: undefined, correctiveAction: "", loggedBy: "" });
+    reset({ temperature: undefined, correctiveAction: "", loggedBy: NO_USER_VALUE });
     setIsDialogOpen(true);
   };
   
@@ -81,7 +97,7 @@ export default function TemperaturesPage() {
     reset({
       temperature: log.temperature,
       correctiveAction: log.correctiveAction || "",
-      loggedBy: log.loggedBy || "",
+      loggedBy: log.loggedBy || NO_USER_VALUE,
     });
     setIsDialogOpen(true);
   };
@@ -102,7 +118,7 @@ export default function TemperaturesPage() {
            ...editingLog, 
            ...submittedData, 
            temperature: Number(submittedData.temperature),
-        }, selectedAppliance);
+        }, selectedAppliance); // Pass selectedAppliance to determine compliance
        toast({ title: "Log Updated", className: "bg-accent text-accent-foreground" });
     } else {
         addTemperatureLog({ 
@@ -110,7 +126,7 @@ export default function TemperaturesPage() {
             temperature: Number(submittedData.temperature),
             correctiveAction: submittedData.correctiveAction,
             loggedBy: submittedData.loggedBy,
-        }, selectedAppliance);
+        }, selectedAppliance); // Pass selectedAppliance
        toast({ title: "Log Added", className: "bg-accent text-accent-foreground" });
     }
     setIsDialogOpen(false);
@@ -130,6 +146,11 @@ export default function TemperaturesPage() {
     const user = findUserById(userId);
     return user ? user.name : 'Unknown User';
   }
+  
+  const formatExpectedRange = (range: TemperatureRange | null): string => {
+    if (!range) return 'N/A';
+    return `${range.min}°C to ${range.max}°C`;
+  };
 
   return (
     <div className="flex flex-col min-h-screen">
@@ -140,7 +161,7 @@ export default function TemperaturesPage() {
         <Card>
           <CardHeader>
             <CardTitle>Log Temperatures by Appliance</CardTitle>
-            <CardDescription>Click on an appliance to log its current temperature.</CardDescription>
+            <CardDescription>Click on an appliance to log its current temperature. Expected ranges are based on appliance-specific settings or system defaults by type (Fridge, Freezer, Hot Hold).</CardDescription>
           </CardHeader>
           <CardContent className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
             {appliances.map((appliance) => (
@@ -152,7 +173,7 @@ export default function TemperaturesPage() {
               >
                 <Thermometer className="h-6 w-6 mb-1 text-primary" />
                 <span className="text-sm font-medium">{appliance.name}</span>
-                <span className="text-xs text-muted-foreground">{appliance.location}</span>
+                <span className="text-xs text-muted-foreground">{appliance.location} ({appliance.type})</span>
               </Button>
             ))}
              {appliances.length === 0 && <p className="col-span-full text-center text-muted-foreground">No appliances configured. Please add appliances in Settings.</p>}
@@ -173,9 +194,9 @@ export default function TemperaturesPage() {
               </DialogTitle>
               <DialogDescription>
                 Enter the current temperature and any corrective actions if necessary.
-                {selectedAppliance && (typeof selectedAppliance.minTemp === 'number' || typeof selectedAppliance.maxTemp === 'number') && (
+                {selectedAppliance && (
                   <span className="block text-xs mt-1">
-                    Expected range: {selectedAppliance.minTemp ?? "N/A"}°C to {selectedAppliance.maxTemp ?? "N/A"}°C.
+                    Expected range: {formatExpectedRange(effectiveTempRangeForSelectedAppliance)}.
                   </span>
                 )}
               </DialogDescription>
@@ -214,7 +235,7 @@ export default function TemperaturesPage() {
                 render={({ field }) => (
                   <div>
                     <Label htmlFor="loggedByTemp">Logged By</Label>
-                    <Select onValueChange={field.onChange} value={field.value || ""}>
+                    <Select onValueChange={field.onChange} value={field.value || NO_USER_VALUE}>
                       <SelectTrigger id="loggedByTemp">
                         <SelectValue placeholder="Select user" />
                       </SelectTrigger>

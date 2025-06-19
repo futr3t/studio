@@ -10,7 +10,7 @@ export interface Appliance {
   id: string;
   name: string;
   location: string;
-  type: string; // e.g., Fridge, Freezer, Oven
+  type: string; // e.g., Fridge, Freezer, Oven, Hot Hold
   minTemp?: number;
   maxTemp?: number;
 }
@@ -23,7 +23,7 @@ export interface ProductionLog {
   criticalLimitDetails: string; // e.g. "Cooked to 75°C"
   isCompliant: boolean;
   correctiveAction?: string;
-  verifiedBy?: string;
+  verifiedBy?: string; // User ID
 }
 
 export interface DeliveryItem {
@@ -45,7 +45,7 @@ export interface DeliveryLog {
   overallCondition?: 'good' | 'fair' | 'poor';
   isCompliant: boolean;
   correctiveAction?: string;
-  receivedBy?: string;
+  receivedBy?: string; // User ID
 }
 
 export interface TemperatureLog {
@@ -55,7 +55,7 @@ export interface TemperatureLog {
   logTime: string; // ISO Date string
   isCompliant: boolean;
   correctiveAction?: string;
-  loggedBy?: string;
+  loggedBy?: string; // User ID
 }
 
 export type CleaningFrequency = 'daily' | 'weekly' | 'monthly' | 'as_needed';
@@ -78,7 +78,7 @@ export interface CleaningChecklistItem { // Instance of a task for logging
   description?: string;
   completed: boolean;
   completedAt?: string; // ISO Date string
-  completedBy?: string; // User ID or name
+  completedBy?: string; // User ID
   notes?: string;
 }
 
@@ -107,4 +107,22 @@ export interface ActivityFeedItem {
   itemIcon: React.ElementType; // Lucide icon component for the item type
   isNonCompliant?: boolean; // Optional flag for styling
   logType: 'production' | 'delivery' | 'temperature' | 'cleaning';
+}
+
+// For System Parameters
+export interface TemperatureRange {
+  min: number;
+  max: number;
+}
+
+export interface SystemParameters {
+  temperatureRanges: {
+    fridge: TemperatureRange;
+    freezer: TemperatureRange;
+    hotHold: TemperatureRange;
+  };
+  notifications: {
+    emailAlerts: boolean;
+    smsAlerts: boolean;
+  };
 }

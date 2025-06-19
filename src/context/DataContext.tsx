@@ -4,15 +4,27 @@ import React, { createContext, useContext, useState, ReactNode, useCallback } fr
 import { formatISO } from 'date-fns';
 import type {
   Supplier, Appliance, ProductionLog, DeliveryLog, TemperatureLog,
-  CleaningTask, CleaningChecklistItem, User, ActivityFeedItem
+  CleaningTask, CleaningChecklistItem, User, ActivityFeedItem, SystemParameters, TemperatureRange
 } from '@/lib/types';
 import {
   mockSuppliersData, mockAppliancesData, mockProductionLogsData,
   mockDeliveryLogsData, mockTemperatureLogsData, mockCleaningTasksData,
-  mockCleaningChecklistItemsData, mockUsersData
+  mockCleaningChecklistItemsData, mockUsersData, STATIC_NOW
 } from '@/lib/data';
 import { CheckCircle2, AlertTriangle, ClipboardList, Thermometer, Sparkles, Truck, Factory } from 'lucide-react';
 import { useToast } from "@/hooks/use-toast";
+
+const initialSystemParameters: SystemParameters = {
+  temperatureRanges: {
+    fridge: { min: 0, max: 5 },
+    freezer: { min: -25, max: -18 },
+    hotHold: { min: 63, max: 75 },
+  },
+  notifications: {
+    emailAlerts: true,
+    smsAlerts: false,
+  },
+};
 
 interface DataContextType {
   suppliers: Supplier[];
@@ -23,7 +35,10 @@ interface DataContextType {
   cleaningTasks: CleaningTask[]; // Definitions
   cleaningChecklistItems: CleaningChecklistItem[]; // Instances
   users: User[];
+  systemParameters: SystemParameters;
   getRecentActivities: (limit?: number) => ActivityFeedItem[];
+
+  updateSystemParameters: (newParams: SystemParameters) => void;
 
   addSupplier: (supplierData: Omit<Supplier, 'id'>) => void;
   updateSupplier: (updatedSupplier: Supplier) => void;
@@ -41,8 +56,8 @@ interface DataContextType {
   updateDeliveryLog: (updatedLog: DeliveryLog) => void;
   deleteDeliveryLog: (logId: string) => void;
 
-  addTemperatureLog: (logData: Omit<TemperatureLog, 'id' | 'logTime' | 'isCompliant'>, applianceForCompliance: Appliance) => void;
-  updateTemperatureLog: (updatedLog: Omit<TemperatureLog, 'isCompliant'>, applianceForCompliance: Appliance) => void;
+  addTemperatureLog: (logData: Omit<TemperatureLog, 'id' | 'logTime' | 'isCompliant'>, appliance: Appliance) => void;
+  updateTemperatureLog: (updatedLogData: Omit<TemperatureLog, 'isCompliant'>, appliance: Appliance) => void;
   deleteTemperatureLog: (logId: string) => void;
 
   addCleaningTaskDefinition: (taskData: Omit<CleaningTask, 'id'>) => void;
@@ -56,6 +71,7 @@ interface DataContextType {
   deleteUser: (userId: string) => void;
 
   findUserById: (userId: string) => User | undefined;
+  getApplianceEffectiveTempRange: (appliance: Appliance) => TemperatureRange | null;
 }
 
 const DataContext = createContext<DataContextType | undefined>(undefined);
@@ -69,11 +85,33 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const [cleaningTasks, setCleaningTasks] = useState<CleaningTask[]>(mockCleaningTasksData);
   const [cleaningChecklistItems, setCleaningChecklistItems] = useState<CleaningChecklistItem[]>(mockCleaningChecklistItemsData);
   const [users, setUsers] = useState<User[]>(mockUsersData);
+  const [systemParameters, setSystemParameters] = useState<SystemParameters>(initialSystemParameters);
   const { toast } = useToast();
 
+  const updateSystemParameters = (newParams: SystemParameters) => {
+    setSystemParameters(newParams);
+    toast({ title: "System Parameters Updated", description: "Settings have been saved.", className: "bg-accent text-accent-foreground" });
+  };
+  
   const findUserById = useCallback((userId: string): User | undefined => {
     return users.find(u => u.id === userId);
   }, [users]);
+
+  const getApplianceEffectiveTempRange = useCallback((appliance: Appliance): TemperatureRange | null => {
+    if (typeof appliance.minTemp === 'number' && typeof appliance.maxTemp === 'number') {
+      return { min: appliance.minTemp, max: appliance.maxTemp };
+    }
+    const typeKey = appliance.type.toLowerCase().replace(/\s+/g, ''); // e.g. "walkinfridge" -> "walkinfridge", "hot hold" -> "hothold"
+    
+    if (typeKey.includes('fridge')) {
+      return systemParameters.temperatureRanges.fridge;
+    } else if (typeKey.includes('freezer')) {
+      return systemParameters.temperatureRanges.freezer;
+    } else if (typeKey.includes('hothold') || typeKey.includes('bainmarie') || typeKey.includes('oven')) { // Oven might have its own range, but for now using hotHold
+      return systemParameters.temperatureRanges.hotHold;
+    }
+    return null; // No specific or system default range applies
+  }, [systemParameters.temperatureRanges]);
 
   const addSupplier = (supplierData: Omit<Supplier, 'id'>) => {
     const newSupplier = { ...supplierData, id: `sup${Date.now()}` };
@@ -127,17 +165,25 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     setDeliveryLogs(prev => prev.filter(l => l.id !== logId));
   };
 
-  const addTemperatureLog = (logData: Omit<TemperatureLog, 'id' | 'logTime' | 'isCompliant'>, applianceForCompliance: Appliance) => {
+  const addTemperatureLog = (logData: Omit<TemperatureLog, 'id' | 'logTime' | 'isCompliant'>, appliance: Appliance) => {
     let isCompliant = true;
-    if (typeof applianceForCompliance.minTemp === 'number' && logData.temperature < applianceForCompliance.minTemp) isCompliant = false;
-    if (typeof applianceForCompliance.maxTemp === 'number' && logData.temperature > applianceForCompliance.maxTemp) isCompliant = false;
+    const effectiveRange = getApplianceEffectiveTempRange(appliance);
+    if (effectiveRange) {
+      if (logData.temperature < effectiveRange.min) isCompliant = false;
+      if (logData.temperature > effectiveRange.max) isCompliant = false;
+    }
+    // If no effective range, it remains compliant by default or based on other criteria not yet defined.
     const newLog = { ...logData, id: `temp${Date.now()}`, logTime: formatISO(new Date()), isCompliant };
     setTemperatureLogs(prev => [newLog, ...prev]);
   };
-  const updateTemperatureLog = (updatedLogData: Omit<TemperatureLog, 'isCompliant'>, applianceForCompliance: Appliance) => {
-     let isCompliant = true;
-    if (typeof applianceForCompliance.minTemp === 'number' && updatedLogData.temperature < applianceForCompliance.minTemp) isCompliant = false;
-    if (typeof applianceForCompliance.maxTemp === 'number' && updatedLogData.temperature > applianceForCompliance.maxTemp) isCompliant = false;
+  
+  const updateTemperatureLog = (updatedLogData: Omit<TemperatureLog, 'isCompliant'>, appliance: Appliance) => {
+    let isCompliant = true;
+    const effectiveRange = getApplianceEffectiveTempRange(appliance);
+     if (effectiveRange) {
+      if (updatedLogData.temperature < effectiveRange.min) isCompliant = false;
+      if (updatedLogData.temperature > effectiveRange.max) isCompliant = false;
+    }
     const finalLog = { ...updatedLogData, logTime: formatISO(new Date()), isCompliant };
     setTemperatureLogs(prev => prev.map(l => l.id === finalLog.id ? finalLog : l));
   };
@@ -196,9 +242,9 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         logType: 'production',
         timestamp: log.logTime,
         description: `Production: ${log.productName} (Batch #${log.batchCode})`,
-        user: verifier ? verifier.name : (log.verifiedBy || undefined), // Fallback for old string names
+        user: verifier?.name,
         statusIcon: log.isCompliant ? CheckCircle2 : AlertTriangle,
-        itemIcon: Factory, // Changed from ClipboardList to Factory for Production
+        itemIcon: Factory,
         isNonCompliant: !log.isCompliant
       });
     });
@@ -211,7 +257,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         logType: 'temperature',
         timestamp: log.logTime,
         description: `Temperature: ${appliance?.name || 'Unknown'} (${log.temperature}°C)`,
-        user: logger ? logger.name : (log.loggedBy || undefined),
+        user: logger?.name,
         statusIcon: log.isCompliant ? CheckCircle2 : AlertTriangle,
         itemIcon: Thermometer,
         isNonCompliant: !log.isCompliant
@@ -225,7 +271,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         logType: 'cleaning',
         timestamp: task.completedAt!,
         description: `Cleaning: ${task.name} completed`,
-        user: completingUser ? completingUser.name : (task.completedBy || undefined),
+        user: completingUser?.name,
         statusIcon: CheckCircle2,
         itemIcon: Sparkles,
       });
@@ -233,14 +279,13 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     
     deliveryLogs.forEach(log => {
         const supplier = suppliers.find(s => s.id === log.supplierId);
-        // Assuming receivedBy could also be a user ID in future, or a name string
         const receiverUser = log.receivedBy ? findUserById(log.receivedBy) : null; 
         activities.push({
             id: `del-${log.id}`,
             logType: 'delivery',
             timestamp: log.deliveryTime,
             description: `Delivery: From ${supplier?.name || 'Unknown'} (${log.items.length} items)`,
-            user: receiverUser ? receiverUser.name : (log.receivedBy || undefined),
+            user: receiverUser?.name,
             statusIcon: log.isCompliant ? CheckCircle2 : AlertTriangle,
             itemIcon: Truck,
             isNonCompliant: !log.isCompliant
@@ -250,13 +295,13 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     return activities
       .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
       .slice(0, limit);
-  }, [productionLogs, temperatureLogs, cleaningChecklistItems, deliveryLogs, appliances, users, suppliers, findUserById]);
+  }, [productionLogs, temperatureLogs, cleaningChecklistItems, deliveryLogs, appliances, users, suppliers, findUserById, getApplianceEffectiveTempRange]);
 
 
   const value: DataContextType = {
     suppliers, appliances, productionLogs, deliveryLogs, temperatureLogs,
-    cleaningTasks, cleaningChecklistItems, users,
-    getRecentActivities,
+    cleaningTasks, cleaningChecklistItems, users, systemParameters,
+    getRecentActivities, updateSystemParameters,
     addSupplier, updateSupplier, deleteSupplier,
     addAppliance, updateAppliance, deleteAppliance,
     addProductionLog, updateProductionLog, deleteProductionLog,
@@ -265,7 +310,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     addCleaningTaskDefinition, updateCleaningTaskDefinition, deleteCleaningTaskDefinition,
     updateCleaningChecklistItem,
     addUser, updateUser, deleteUser,
-    findUserById,
+    findUserById, getApplianceEffectiveTempRange
   };
 
   return <DataContext.Provider value={value}>{children}</DataContext.Provider>;
@@ -278,3 +323,4 @@ export const useData = (): DataContextType => {
   }
   return context;
 };
+
