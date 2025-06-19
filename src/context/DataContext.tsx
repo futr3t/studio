@@ -6,71 +6,102 @@ import type {
   Supplier, Appliance, ProductionLog, DeliveryLog, TemperatureLog,
   CleaningTask, CleaningChecklistItem, User, ActivityFeedItem, SystemParameters, TemperatureRange, DataContextType
 } from '@/lib/types';
-import {
-  mockAppliancesData, mockProductionLogsData,
-  mockDeliveryLogsData, mockTemperatureLogsData, mockCleaningTasksData,
-  mockCleaningChecklistItemsData, mockUsersData, STATIC_NOW
-} from '@/lib/data'; // mockSuppliersData removed from here
+// Mock data imports are removed as data will be fetched from API
 import { CheckCircle2, AlertTriangle, ClipboardList, Thermometer, Sparkles, Truck, Factory } from 'lucide-react';
 import { useToast } from "@/hooks/use-toast";
 
-const initialSystemParameters: SystemParameters = {
+const initialSystemParameters: SystemParameters = { // Default fallback
   temperatureRanges: {
     fridge: { min: 0, max: 5 },
     freezer: { min: -25, max: -18 },
     hotHold: { min: 63, max: 75 },
   },
-  notifications: {
-    emailAlerts: true,
-    smsAlerts: false,
-  },
+  notifications: { emailAlerts: true, smsAlerts: false },
 };
 
 const DataContext = createContext<DataContextType | undefined>(undefined);
 
 export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-  const [suppliers, setSuppliers] = useState<Supplier[]>([]); // Initialize as empty
-  const [appliances, setAppliances] = useState<Appliance[]>(mockAppliancesData);
-  const [productionLogs, setProductionLogs] = useState<ProductionLog[]>(mockProductionLogsData);
-  const [deliveryLogs, setDeliveryLogs] = useState<DeliveryLog[]>(mockDeliveryLogsData);
-  const [temperatureLogs, setTemperatureLogs] = useState<TemperatureLog[]>(mockTemperatureLogsData);
-  const [cleaningTasks, setCleaningTasks] = useState<CleaningTask[]>(mockCleaningTasksData);
-  const [cleaningChecklistItems, setCleaningChecklistItems] = useState<CleaningChecklistItem[]>(mockCleaningChecklistItemsData);
-  const [users, setUsers] = useState<User[]>(mockUsersData);
+  const [suppliers, setSuppliers] = useState<Supplier[]>([]);
+  const [appliances, setAppliances] = useState<Appliance[]>([]);
+  const [productionLogs, setProductionLogs] = useState<ProductionLog[]>([]);
+  const [deliveryLogs, setDeliveryLogs] = useState<DeliveryLog[]>([]);
+  const [temperatureLogs, setTemperatureLogs] = useState<TemperatureLog[]>([]);
+  const [cleaningTasks, setCleaningTasks] = useState<CleaningTask[]>([]);
+  const [cleaningChecklistItems, setCleaningChecklistItems] = useState<CleaningChecklistItem[]>([]);
+  const [users, setUsers] = useState<User[]>([]);
   const [systemParameters, setSystemParameters] = useState<SystemParameters>(initialSystemParameters);
   const [currentUser, setCurrentUserInternal] = useState<User | null>(null);
   const { toast } = useToast();
 
-  const fetchSuppliers = useCallback(async () => {
+  const fetchData = useCallback(async <T,>(endpoint: string, setter: React.Dispatch<React.SetStateAction<T[]>>, entityName: string) => {
     try {
-      const response = await fetch('/api/suppliers');
-      if (!response.ok) {
-        throw new Error('Failed to fetch suppliers');
-      }
-      const data: Supplier[] = await response.json();
-      setSuppliers(data);
+      const response = await fetch(`/api/${endpoint}`);
+      if (!response.ok) throw new Error(`Failed to fetch ${entityName}`);
+      const data: T[] = await response.json();
+      setter(data);
     } catch (error) {
-      console.error("Error loading suppliers:", error);
-      toast({ title: "Error", description: "Could not load suppliers.", variant: "destructive" });
+      console.error(`Error loading ${entityName}:`, error);
+      toast({ title: "Error", description: `Could not load ${entityName}.`, variant: "destructive" });
+    }
+  }, [toast]);
+
+  const fetchSingleData = useCallback(async <T,>(endpoint: string, setter: React.Dispatch<React.SetStateAction<T>>, entityName: string, defaultValue: T) => {
+    try {
+      const response = await fetch(`/api/${endpoint}`);
+      if (!response.ok) throw new Error(`Failed to fetch ${entityName}`);
+      const data: T = await response.json();
+      setter(data);
+    } catch (error) {
+      console.error(`Error loading ${entityName}:`, error);
+      toast({ title: "Error", description: `Could not load ${entityName}.`, variant: "destructive" });
+      setter(defaultValue); // Set to default if fetch fails
     }
   }, [toast]);
 
   useEffect(() => {
-    fetchSuppliers();
-    const initialUser = mockUsersData.find(u => u.role === 'admin') || mockUsersData[0] || null;
-    setCurrentUserInternal(initialUser);
-  }, [fetchSuppliers]);
+    fetchData<Supplier>('suppliers', setSuppliers, 'suppliers');
+    fetchData<Appliance>('appliances', setAppliances, 'appliances');
+    fetchData<ProductionLog>('production-logs', setProductionLogs, 'production logs');
+    fetchData<DeliveryLog>('delivery-logs', setDeliveryLogs, 'delivery logs');
+    fetchData<TemperatureLog>('temperature-logs', setTemperatureLogs, 'temperature logs');
+    fetchData<CleaningTask>('cleaning-tasks', setCleaningTasks, 'cleaning task definitions');
+    fetchData<CleaningChecklistItem>('cleaning-checklist-items', setCleaningChecklistItems, 'cleaning checklist items');
+    fetchData<User>('users', setUsers, 'users').then(() => {
+        // Set initial user after users are fetched
+        // This is a simplified way; a real app would have auth determining the user.
+        fetch('/api/users')
+          .then(res => res.json())
+          .then((allUsers: User[]) => {
+            const adminUser = allUsers.find(u => u.role === 'admin') || allUsers[0] || null;
+            setCurrentUserInternal(adminUser);
+          }).catch(() => setCurrentUserInternal(null));
+    });
+    fetchSingleData<SystemParameters>('system-parameters', setSystemParameters, 'system parameters', initialSystemParameters);
+  }, [fetchData, fetchSingleData]);
 
 
   const setCurrentUser = (user: User | null) => {
     setCurrentUserInternal(user);
   };
 
-  const updateSystemParameters = (newParams: SystemParameters) => {
-    setSystemParameters(newParams);
-    toast({ title: "System Parameters Updated", description: "Settings have been saved.", className: "bg-accent text-accent-foreground" });
+  const updateSystemParameters = async (newParams: SystemParameters) => {
+     try {
+      const response = await fetch('/api/system-parameters', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(newParams),
+      });
+      if (!response.ok) throw new Error('Failed to update system parameters');
+      const updatedParams = await response.json();
+      setSystemParameters(updatedParams);
+      toast({ title: "System Parameters Updated", description: "Settings have been saved.", className: "bg-accent text-accent-foreground" });
+    } catch (error) {
+      console.error("Error updating system parameters:", error);
+      toast({ title: "Error", description: "Could not update system parameters.", variant: "destructive" });
+    }
   };
-  
+
   const findUserById = useCallback((userId: string): User | undefined => {
     return users.find(u => u.id === userId);
   }, [users]);
@@ -79,178 +110,97 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     if (typeof appliance.minTemp === 'number' && typeof appliance.maxTemp === 'number') {
       return { min: appliance.minTemp, max: appliance.maxTemp };
     }
-    const typeKey = appliance.type.toLowerCase().replace(/\s+/g, ''); 
-    
-    if (typeKey.includes('fridge')) {
-      return systemParameters.temperatureRanges.fridge;
-    } else if (typeKey.includes('freezer')) {
-      return systemParameters.temperatureRanges.freezer;
-    } else if (typeKey.includes('hothold') || typeKey.includes('bainmarie') || typeKey.includes('oven')) {
-      return systemParameters.temperatureRanges.hotHold;
-    }
+    const typeKey = appliance.type.toLowerCase().replace(/\s+/g, '');
+    if (typeKey.includes('fridge')) return systemParameters.temperatureRanges.fridge;
+    if (typeKey.includes('freezer')) return systemParameters.temperatureRanges.freezer;
+    if (typeKey.includes('hothold') || typeKey.includes('bainmarie') || typeKey.includes('oven')) return systemParameters.temperatureRanges.hotHold;
     return null;
   }, [systemParameters.temperatureRanges]);
 
-  const addSupplier = async (supplierData: Omit<Supplier, 'id'>) => {
+  // Generic CRUD operations
+  const makeApiRequest = async <T, U>(
+    method: 'POST' | 'PUT' | 'DELETE',
+    endpoint: string,
+    body?: U,
+    entityName?: string,
+    successMessage?: string,
+    id?: string,
+  ): Promise<T | null> => {
     try {
-      const response = await fetch('/api/suppliers', {
-        method: 'POST',
+      const response = await fetch(id ? `/api/${endpoint}/${id}` : `/api/${endpoint}`, {
+        method,
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(supplierData),
+        body: body ? JSON.stringify(body) : undefined,
       });
       if (!response.ok) {
-        throw new Error('Failed to add supplier');
+        const errorData = await response.json();
+        throw new Error(errorData.message || `Failed to ${method.toLowerCase()} ${entityName || 'item'}`);
       }
-      const newSupplier: Supplier = await response.json();
-      setSuppliers(prev => [newSupplier, ...prev]); // Optimistic update or re-fetch
-      toast({ title: "Supplier Added", description: `${newSupplier.name} has been added.`, className: "bg-accent text-accent-foreground" });
-      await fetchSuppliers(); // Re-fetch to ensure consistency if API modifies data
-    } catch (error) {
-      console.error("Error adding supplier:", error);
-      toast({ title: "Error", description: "Could not add supplier.", variant: "destructive" });
-    }
-  };
-
-  const updateSupplier = async (updatedSupplier: Supplier) => {
-    try {
-      const response = await fetch(`/api/suppliers/${updatedSupplier.id}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(updatedSupplier),
-      });
-      if (!response.ok) {
-        throw new Error('Failed to update supplier');
+      const result = method !== 'DELETE' ? await response.json() : null;
+      if (successMessage && entityName) {
+        toast({ title: `${entityName} ${successMessage}`, className: "bg-accent text-accent-foreground" });
+      } else if (method === 'DELETE' && entityName) {
+         toast({ title: `${entityName} Deleted`, variant: "destructive" });
       }
-      const returnedSupplier: Supplier = await response.json();
-      setSuppliers(prev => prev.map(s => s.id === returnedSupplier.id ? returnedSupplier : s));
-      toast({ title: "Supplier Updated", description: `${returnedSupplier.name} has been updated.`, className: "bg-accent text-accent-foreground" });
-      await fetchSuppliers(); 
+      // Re-fetch relevant data
+      if (endpoint.startsWith('suppliers')) fetchData<Supplier>('suppliers', setSuppliers, 'suppliers');
+      else if (endpoint.startsWith('appliances')) fetchData<Appliance>('appliances', setAppliances, 'appliances');
+      else if (endpoint.startsWith('production-logs')) fetchData<ProductionLog>('production-logs', setProductionLogs, 'production logs');
+      else if (endpoint.startsWith('delivery-logs')) fetchData<DeliveryLog>('delivery-logs', setDeliveryLogs, 'delivery logs');
+      else if (endpoint.startsWith('temperature-logs')) fetchData<TemperatureLog>('temperature-logs', setTemperatureLogs, 'temperature logs');
+      else if (endpoint.startsWith('cleaning-tasks')) fetchData<CleaningTask>('cleaning-tasks', setCleaningTasks, 'cleaning task definitions');
+      else if (endpoint.startsWith('cleaning-checklist-items')) fetchData<CleaningChecklistItem>('cleaning-checklist-items', setCleaningChecklistItems, 'cleaning checklist items');
+      else if (endpoint.startsWith('users')) fetchData<User>('users', setUsers, 'users');
+      
+      return result;
     } catch (error) {
-      console.error("Error updating supplier:", error);
-      toast({ title: "Error", description: "Could not update supplier.", variant: "destructive" });
+      console.error(`Error ${method.toLowerCase()}ing ${entityName || 'item'}:`, error);
+      toast({ title: "Error", description: (error as Error).message || `Could not perform operation on ${entityName || 'item'}.`, variant: "destructive" });
+      return null;
     }
   };
 
-  const deleteSupplier = async (supplierId: string) => {
-    const supplierToDelete = suppliers.find(s => s.id === supplierId);
-    try {
-      const response = await fetch(`/api/suppliers/${supplierId}`, {
-        method: 'DELETE',
-      });
-      if (!response.ok) {
-        throw new Error('Failed to delete supplier');
-      }
-      setSuppliers(prev => prev.filter(s => s.id !== supplierId));
-      toast({ title: "Supplier Deleted", description: `${supplierToDelete?.name || 'Supplier'} has been removed.`, variant: "destructive" });
-      // No need to re-fetch if API confirms deletion and we filter locally
-    } catch (error) {
-      console.error("Error deleting supplier:", error);
-      toast({ title: "Error", description: "Could not delete supplier.", variant: "destructive" });
-    }
-  };
 
-  const addAppliance = (applianceData: Omit<Appliance, 'id'>) => {
-    const newAppliance = { ...applianceData, id: `app${Date.now()}` };
-    setAppliances(prev => [newAppliance, ...prev]);
-     toast({ title: "Appliance Added", description: `${newAppliance.name} has been added.`, className: "bg-accent text-accent-foreground" });
-  };
-  const updateAppliance = (updatedAppliance: Appliance) => {
-    setAppliances(prev => prev.map(a => a.id === updatedAppliance.id ? updatedAppliance : a));
-    toast({ title: "Appliance Updated", description: `${updatedAppliance.name} has been updated.`, className: "bg-accent text-accent-foreground" });
-  };
-  const deleteAppliance = (applianceId: string) => {
-    const name = appliances.find(a => a.id === applianceId)?.name || 'Appliance';
-    setAppliances(prev => prev.filter(a => a.id !== applianceId));
-     toast({ title: "Appliance Deleted", description: `${name} has been removed.`, variant: "destructive" });
-  };
+  // Supplier functions
+  const addSupplier = (data: Omit<Supplier, 'id'>) => makeApiRequest<Supplier, Omit<Supplier, 'id'>>('POST', 'suppliers', data, 'Supplier', 'Added');
+  const updateSupplier = (data: Supplier) => makeApiRequest<Supplier, Supplier>('PUT', 'suppliers', data, 'Supplier', 'Updated', data.id);
+  const deleteSupplier = (id: string) => makeApiRequest<null, void>('DELETE', 'suppliers', undefined, 'Supplier', '', id);
 
-  const addProductionLog = (logData: Omit<ProductionLog, 'id' | 'logTime'>) => {
-    const newLog = { ...logData, id: `prod${Date.now()}`, logTime: formatISO(new Date()) };
-    setProductionLogs(prev => [newLog, ...prev]);
-  };
-  const updateProductionLog = (updatedLog: ProductionLog) => {
-    setProductionLogs(prev => prev.map(l => l.id === updatedLog.id ? {...updatedLog, logTime: formatISO(new Date())} : l));
-  };
-  const deleteProductionLog = (logId: string) => {
-    setProductionLogs(prev => prev.filter(l => l.id !== logId));
-  };
+  // Appliance functions
+  const addAppliance = (data: Omit<Appliance, 'id'>) => makeApiRequest<Appliance, Omit<Appliance, 'id'>>('POST', 'appliances', data, 'Appliance', 'Added');
+  const updateAppliance = (data: Appliance) => makeApiRequest<Appliance, Appliance>('PUT', 'appliances', data, 'Appliance', 'Updated', data.id);
+  const deleteAppliance = (id: string) => makeApiRequest<null, void>('DELETE', 'appliances', undefined, 'Appliance', '', id);
+
+  // Production Log functions
+  const addProductionLog = (data: Omit<ProductionLog, 'id' | 'logTime'>) => makeApiRequest<ProductionLog, Omit<ProductionLog, 'id' | 'logTime'>>('POST', 'production-logs', data, 'Production Log', 'Added');
+  const updateProductionLog = (data: ProductionLog) => makeApiRequest<ProductionLog, ProductionLog>('PUT', 'production-logs', data, 'Production Log', 'Updated', data.id);
+  const deleteProductionLog = (id: string) => makeApiRequest<null, void>('DELETE', 'production-logs', undefined, 'Production Log', '', id);
+
+  // Delivery Log functions
+  const addDeliveryLog = (data: Omit<DeliveryLog, 'id' | 'deliveryTime'>) => makeApiRequest<DeliveryLog, Omit<DeliveryLog, 'id' | 'deliveryTime'>>('POST', 'delivery-logs', data, 'Delivery Log', 'Added');
+  const updateDeliveryLog = (data: DeliveryLog) => makeApiRequest<DeliveryLog, DeliveryLog>('PUT', 'delivery-logs', data, 'Delivery Log', 'Updated', data.id);
+  const deleteDeliveryLog = (id: string) => makeApiRequest<null, void>('DELETE', 'delivery-logs', undefined, 'Delivery Log', '', id);
   
-  const addDeliveryLog = (logData: Omit<DeliveryLog, 'id' | 'deliveryTime'>) => {
-    const newLog = { ...logData, id: `del${Date.now()}`, deliveryTime: formatISO(new Date()) };
-    setDeliveryLogs(prev => [newLog, ...prev]);
-  };
-  const updateDeliveryLog = (updatedLog: DeliveryLog) => {
-    setDeliveryLogs(prev => prev.map(l => l.id === updatedLog.id ? {...updatedLog, deliveryTime: formatISO(new Date())} : l));
-  };
-  const deleteDeliveryLog = (logId: string) => {
-    setDeliveryLogs(prev => prev.filter(l => l.id !== logId));
-  };
+  // Temperature Log functions (add/update need appliance for compliance check on API side for now)
+  const addTemperatureLog = (data: Omit<TemperatureLog, 'id' | 'logTime' | 'isCompliant'>, appliance: Appliance) => makeApiRequest<TemperatureLog, Omit<TemperatureLog, 'id' | 'logTime' | 'isCompliant'> & {applianceId: string}>('POST', 'temperature-logs', {...data, applianceId: appliance.id}, 'Temperature Log', 'Added');
+  const updateTemperatureLog = (data: Omit<TemperatureLog, 'isCompliant'>, appliance: Appliance) => makeApiRequest<TemperatureLog, Omit<TemperatureLog, 'isCompliant'> & {applianceId: string}>('PUT', 'temperature-logs', {...data, applianceId: appliance.id}, 'Temperature Log', 'Updated', data.id);
+  const deleteTemperatureLog = (id: string) => makeApiRequest<null, void>('DELETE', 'temperature-logs', undefined, 'Temperature Log', '', id);
 
-  const addTemperatureLog = (logData: Omit<TemperatureLog, 'id' | 'logTime' | 'isCompliant'>, appliance: Appliance) => {
-    let isCompliant = true;
-    const effectiveRange = getApplianceEffectiveTempRange(appliance);
-    if (effectiveRange) {
-      if (logData.temperature < effectiveRange.min) isCompliant = false;
-      if (logData.temperature > effectiveRange.max) isCompliant = false;
-    }
-    const newLog = { ...logData, id: `temp${Date.now()}`, logTime: formatISO(new Date()), isCompliant };
-    setTemperatureLogs(prev => [newLog, ...prev]);
-  };
+  // Cleaning Task Definition functions
+  const addCleaningTaskDefinition = (data: Omit<CleaningTask, 'id'>) => makeApiRequest<CleaningTask, Omit<CleaningTask, 'id'>>('POST', 'cleaning-tasks', data, 'Cleaning Task Definition', 'Added');
+  const updateCleaningTaskDefinition = (data: CleaningTask) => makeApiRequest<CleaningTask, CleaningTask>('PUT', 'cleaning-tasks', data, 'Cleaning Task Definition', 'Updated', data.id);
+  const deleteCleaningTaskDefinition = (id: string) => makeApiRequest<null, void>('DELETE', 'cleaning-tasks', undefined, 'Cleaning Task Definition', '', id).then(() => {
+    // Also remove related checklist items on the client if not handled by backend cascade (which it isn't for mock)
+    setCleaningChecklistItems(prev => prev.filter(item => item.taskId !== id));
+  });
   
-  const updateTemperatureLog = (updatedLogData: Omit<TemperatureLog, 'isCompliant'>, appliance: Appliance) => {
-    let isCompliant = true;
-    const effectiveRange = getApplianceEffectiveTempRange(appliance);
-     if (effectiveRange) {
-      if (updatedLogData.temperature < effectiveRange.min) isCompliant = false;
-      if (updatedLogData.temperature > effectiveRange.max) isCompliant = false;
-    }
-    const finalLog = { ...updatedLogData, logTime: formatISO(new Date()), isCompliant };
-    setTemperatureLogs(prev => prev.map(l => l.id === finalLog.id ? finalLog : l));
-  };
-  const deleteTemperatureLog = (logId: string) => {
-    setTemperatureLogs(prev => prev.filter(l => l.id !== logId));
-  };
-
-  const addCleaningTaskDefinition = (taskData: Omit<CleaningTask, 'id'>) => {
-    const newTask = { ...taskData, id: `ctDef${Date.now()}` };
-    setCleaningTasks(prev => [newTask, ...prev]);
-     toast({ title: "Cleaning Task Definition Added", description: `${newTask.name} has been added.`, className: "bg-accent text-accent-foreground" });
-  };
-  const updateCleaningTaskDefinition = (updatedTask: CleaningTask) => {
-    setCleaningTasks(prev => prev.map(t => t.id === updatedTask.id ? updatedTask : t));
-    toast({ title: "Cleaning Task Definition Updated", description: `${updatedTask.name} has been updated.`, className: "bg-accent text-accent-foreground" });
-  };
-  const deleteCleaningTaskDefinition = (taskId: string) => {
-    const name = cleaningTasks.find(t => t.id === taskId)?.name || 'Task Definition';
-    setCleaningTasks(prev => prev.filter(t => t.id !== taskId));
-    setCleaningChecklistItems(prev => prev.filter(item => item.taskId !== taskId));
-    toast({ title: "Cleaning Task Definition Deleted", description: `${name} definition and related checklist items removed.`, variant: "destructive" });
-  };
+  // Cleaning Checklist Item functions
+  const updateCleaningChecklistItem = (data: CleaningChecklistItem) => makeApiRequest<CleaningChecklistItem, CleaningChecklistItem>('PUT', 'cleaning-checklist-items', data, 'Cleaning Checklist Item', 'Updated', data.id);
   
-  const updateCleaningChecklistItem = (updatedItem: CleaningChecklistItem) => {
-    setCleaningChecklistItems(prev => prev.map(item => item.id === updatedItem.id ? updatedItem : item));
-    if (updatedItem.completed) {
-        const user = users.find(u => u.id === updatedItem.completedBy);
-        toast({ title: "Task Completed!", description: `${updatedItem.name} marked as complete by ${user?.name || 'Unknown'}.`, className: "bg-accent text-accent-foreground" });
-    } else {
-        toast({ title: "Task Incomplete", description: `${updatedItem.name} marked as pending.` });
-    }
-  };
-  
-  const addUser = (userData: Omit<User, 'id'>) => {
-    const newUser = { ...userData, id: `user${Date.now()}` };
-    setUsers(prev => [newUser, ...prev]);
-    toast({ title: "User Added", description: `${newUser.name} has been added.`, className: "bg-accent text-accent-foreground" });
-  };
-  const updateUser = (updatedUser: User) => {
-    setUsers(prev => prev.map(u => u.id === updatedUser.id ? updatedUser : u));
-    toast({ title: "User Updated", description: `${updatedUser.name} has been updated.`, className: "bg-accent text-accent-foreground" });
-  };
-  const deleteUser = (userId: string) => {
-    const name = users.find(u => u.id === userId)?.name || 'User';
-    setUsers(prev => prev.filter(u => u.id !== userId));
-    toast({ title: "User Deleted", description: `${name} has been removed.`, variant: "destructive" });
-  };
+  // User functions
+  const addUser = (data: Omit<User, 'id'>) => makeApiRequest<User, Omit<User, 'id'>>('POST', 'users', data, 'User', 'Added');
+  const updateUser = (data: User) => makeApiRequest<User, User>('PUT', 'users', data, 'User', 'Updated', data.id);
+  const deleteUser = (id: string) => makeApiRequest<null, void>('DELETE', 'users', undefined, 'User', '', id);
 
   const getRecentActivities = useCallback((limit: number = 5): ActivityFeedItem[] => {
     const activities: ActivityFeedItem[] = [];
@@ -315,7 +265,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     return activities
       .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
       .slice(0, limit);
-  }, [productionLogs, temperatureLogs, cleaningChecklistItems, deliveryLogs, appliances, users, suppliers, findUserById, getApplianceEffectiveTempRange]);
+  }, [productionLogs, temperatureLogs, cleaningChecklistItems, deliveryLogs, appliances, users, suppliers, findUserById]);
 
 
   const value: DataContextType = {
@@ -344,4 +294,3 @@ export const useData = (): DataContextType => {
   }
   return context;
 };
-
