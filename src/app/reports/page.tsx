@@ -18,7 +18,7 @@ import { useData } from '@/context/DataContext';
 import type { ProductionLog, DeliveryLog, TemperatureLog, CleaningChecklistItem, Supplier, Appliance, User } from '@/lib/types';
 import jsPDF from 'jspdf';
 import 'jspdf-autotable';
-import { STATIC_NOW } from '@/lib/data'; // Import STATIC_NOW
+import { STATIC_NOW } from '@/lib/data'; 
 
 interface ReportData {
   reportTitle: string;
@@ -34,10 +34,9 @@ interface ReportSection {
   emptyMessage: string;
 }
 
-// Extend jsPDF with autoTable - required for TypeScript
 interface jsPDFWithAutoTable extends jsPDF {
   autoTable: (options: any) => jsPDFWithAutoTable;
-  lastAutoTable?: { finalY?: number }; // Add this to reflect jspdf-autotable's extension
+  lastAutoTable?: { finalY?: number }; 
 }
 
 export default function ReportsPage() {
@@ -54,21 +53,90 @@ export default function ReportsPage() {
   const { toast } = useToast();
 
   const [generalReportDateRange, setGeneralReportDateRange] = useState<DateRange | undefined>({
-    from: subDays(STATIC_NOW, 29), // Use STATIC_NOW
-    to: STATIC_NOW, // Use STATIC_NOW
+    from: subDays(STATIC_NOW, 29), 
+    to: STATIC_NOW, 
   });
   const [nonCompliantReportDateRange, setNonCompliantReportDateRange] = useState<DateRange | undefined>({
-    from: subDays(STATIC_NOW, 29), // Use STATIC_NOW
-    to: STATIC_NOW, // Use STATIC_NOW
+    from: subDays(STATIC_NOW, 29), 
+    to: STATIC_NOW, 
   });
 
   const getSupplierName = (supplierId: string): string => suppliers.find(s => s.id === supplierId)?.name || supplierId;
   const getApplianceName = (applianceId: string): string => appliances.find(a => a.id === applianceId)?.name || applianceId;
+  const getApplianceById = (applianceId: string): Appliance | undefined => appliances.find(a => a.id === applianceId);
+
   const getUserName = (userId?: string): string => {
-    if (!userId) return 'N/A';
+    if (!userId || userId === "__NONE__") return 'N/A';
     const user = findUserById(userId);
-    return user ? user.name : userId; // Fallback for old string names if any
+    return user ? user.name : userId;
   }
+
+  const generatePdfForReport = (reportData: ReportData, fileNamePrefix: string) => {
+    try {
+      const doc = new jsPDF() as jsPDFWithAutoTable;
+      let yPos = 15;
+
+      doc.setFontSize(18);
+      doc.text(reportData.reportTitle, 14, yPos);
+      yPos += 8;
+
+      doc.setFontSize(10);
+      doc.text(`Date Range: ${reportData.dateRangeFormatted}`, 14, yPos);
+      yPos += 5;
+      doc.text(`Generated At: ${reportData.generatedAt}`, 14, yPos);
+      yPos += 10;
+
+      reportData.sections.forEach(section => {
+        if (yPos > 260 && section.data.length > 0) { 
+          doc.addPage();
+          yPos = 15;
+        }
+        doc.setFontSize(14);
+        doc.text(section.title, 14, yPos);
+        yPos += 6;
+
+        if (section.data.length > 0) {
+          const tableStartY = yPos;
+          doc.autoTable({
+            head: [section.columns],
+            body: section.data,
+            startY: tableStartY,
+            theme: 'striped',
+            headStyles: { fillColor: [59, 130, 246] }, 
+            margin: { top: 10 },
+            styles: { fontSize: 8, cellPadding: 1.5 },
+            columnStyles: { 0: { cellWidth: 'auto' } } 
+          });
+          if (doc.lastAutoTable && typeof doc.lastAutoTable.finalY === 'number') {
+            yPos = doc.lastAutoTable.finalY + 10; 
+          } else {
+            yPos = tableStartY + 20 + (section.data.length * 5); 
+          }
+        } else {
+          doc.setFontSize(10);
+          doc.text(section.emptyMessage, 14, yPos);
+          yPos += 7; 
+        }
+        yPos += 5; 
+      });
+      
+      const fileName = `${fileNamePrefix}_Report_${format(new Date(), "yyyy-MM-dd", { locale: enUS })}.pdf`;
+      doc.save(fileName);
+
+      toast({
+        title: `${fileNamePrefix} Report Generated`,
+        description: `${fileName} has been downloaded.`,
+        className: "bg-accent text-accent-foreground"
+      });
+    } catch (error) {
+        console.error("Failed to generate PDF:", error);
+        toast({
+            title: "PDF Generation Failed",
+            description: "An error occurred while generating the PDF. Please check the console for details.",
+            variant: "destructive",
+        });
+    }
+  };
 
   const handleGenerateGeneralReport = () => {
     if (!generalReportDateRange?.from || !generalReportDateRange?.to) {
@@ -99,10 +167,10 @@ export default function ReportsPage() {
     const deliveryReportData = filteredDeliveryLogs.map(log => [
       format(parseISO(log.deliveryTime), "PPpp", { locale: enUS }),
       getSupplierName(log.supplierId),
-      log.items.map(item => `${item.name} (Qty: ${item.quantity} ${item.unit}, Temp: ${item.temperature ?? 'N/A'}°C, ${item.isCompliant ? 'OK' : 'Not OK'})`).join('; '),
+      log.items.map(item => `${item.name} (Qty: ${item.quantity} ${item.unit}, Temp: ${item.temperature ?? 'N/A'}°C, ${item.isCompliant ? 'OK' : 'Not OK'})`).join('; ') || "N/A",
       log.isCompliant ? "Compliant" : "Non-Compliant",
       log.correctiveAction || "N/A",
-      getUserName(log.receivedBy), // Updated to use getUserName
+      getUserName(log.receivedBy),
       log.vehicleReg || "N/A",
     ]);
     
@@ -160,68 +228,7 @@ export default function ReportsPage() {
       ]
     };
 
-    try {
-      const doc = new jsPDF() as jsPDFWithAutoTable;
-      let yPos = 15;
-
-      doc.setFontSize(18);
-      doc.text(reportData.reportTitle, 14, yPos);
-      yPos += 8;
-
-      doc.setFontSize(10);
-      doc.text(`Date Range: ${reportData.dateRangeFormatted}`, 14, yPos);
-      yPos += 5;
-      doc.text(`Generated At: ${reportData.generatedAt}`, 14, yPos);
-      yPos += 10;
-
-      reportData.sections.forEach(section => {
-        if (yPos > 260 && section.data.length > 0) { 
-          doc.addPage();
-          yPos = 15;
-        }
-        doc.setFontSize(14);
-        doc.text(section.title, 14, yPos);
-        yPos += 6;
-
-        if (section.data.length > 0) {
-          const tableStartY = yPos;
-          doc.autoTable({
-            head: [section.columns],
-            body: section.data,
-            startY: tableStartY,
-            theme: 'striped',
-            headStyles: { fillColor: [59, 130, 246] }, 
-            margin: { top: 10 },
-          });
-          if (doc.lastAutoTable && typeof doc.lastAutoTable.finalY === 'number') {
-            yPos = doc.lastAutoTable.finalY + 10; 
-          } else {
-            yPos = tableStartY + 20 + (section.data.length * 5); 
-          }
-        } else {
-          doc.setFontSize(10);
-          doc.text(section.emptyMessage, 14, yPos);
-          yPos += 7; 
-        }
-        yPos += 5; 
-      });
-      
-      const fileName = `General_Compliance_Report_${format(new Date(), "yyyy-MM-dd", { locale: enUS })}.pdf`;
-      doc.save(fileName);
-
-      toast({
-        title: "General Report Generated",
-        description: `${fileName} has been downloaded.`,
-        className: "bg-accent text-accent-foreground"
-      });
-    } catch (error) {
-        console.error("Failed to generate PDF:", error);
-        toast({
-            title: "PDF Generation Failed",
-            description: "An error occurred while generating the PDF. Please check the console for details.",
-            variant: "destructive",
-        });
-    }
+    generatePdfForReport(reportData, "General_Compliance");
   };
 
   const handleGenerateNonCompliantReport = () => {
@@ -234,12 +241,82 @@ export default function ReportsPage() {
       return;
     }
     
-    console.log("Generating Non-Compliant Logs Report for:", nonCompliantReportDateRange);
-    toast({
-      title: "Non-Compliant Logs Report Generation (Placeholder)",
-      description: `Report for ${format(nonCompliantReportDateRange.from, "PPP", { locale: enUS })} to ${format(nonCompliantReportDateRange.to, "PPP", { locale: enUS })} is being generated. (Not yet implemented)`,
-      className: "bg-accent text-accent-foreground"
-    });
+    const from = startOfDay(nonCompliantReportDateRange.from);
+    const to = endOfDay(nonCompliantReportDateRange.to);
+    const interval = { start: from, end: to };
+
+    const nonCompliantProduction = productionLogs
+      .filter(log => !log.isCompliant && isWithinInterval(parseISO(log.logTime), interval))
+      .map(log => [
+        log.productName,
+        log.batchCode,
+        format(parseISO(log.logTime), "PPpp", { locale: enUS }),
+        log.criticalLimitDetails,
+        log.correctiveAction || "N/A",
+        getUserName(log.verifiedBy)
+      ]);
+
+    const nonCompliantDeliveries = deliveryLogs
+      .filter(log => !log.isCompliant && isWithinInterval(parseISO(log.deliveryTime), interval))
+      .map(log => {
+        const nonCompliantItemsSummary = log.items
+          .filter(item => !item.isCompliant)
+          .map(item => `${item.name} (Qty: ${item.quantity} ${item.unit}, Temp: ${item.temperature ?? 'N/A'}°C, Notes: ${item.notes || 'N/A'})`)
+          .join('; ') || "Overall delivery non-compliant.";
+        return [
+          format(parseISO(log.deliveryTime), "PPpp", { locale: enUS }),
+          getSupplierName(log.supplierId),
+          nonCompliantItemsSummary,
+          log.correctiveAction || "N/A",
+          getUserName(log.receivedBy),
+          log.vehicleReg || "N/A"
+        ];
+      });
+    
+    const nonCompliantTemperatures = temperatureLogs
+      .filter(log => !log.isCompliant && isWithinInterval(parseISO(log.logTime), interval))
+      .map(log => {
+        const appliance = getApplianceById(log.applianceId);
+        const expectedRange = appliance 
+          ? `${appliance.minTemp ?? 'N/A'}°C - ${appliance.maxTemp ?? 'N/A'}°C`
+          : 'N/A';
+        return [
+          getApplianceName(log.applianceId),
+          `${log.temperature.toFixed(1)}°C`,
+          format(parseISO(log.logTime), "PPpp", { locale: enUS }),
+          expectedRange,
+          log.correctiveAction || "N/A",
+          getUserName(log.loggedBy)
+        ];
+      });
+
+    const reportData: ReportData = {
+      reportTitle: "Non-Compliant Logs Report",
+      dateRangeFormatted: `${format(from, "PPP", { locale: enUS })} - ${format(to, "PPP", { locale: enUS })}`,
+      generatedAt: format(new Date(), "PPpp", { locale: enUS }),
+      sections: [
+        {
+          title: "Non-Compliant Production Logs",
+          columns: ["Product", "Batch", "Time", "Limit Details", "Corrective Action", "Verified By"],
+          data: nonCompliantProduction,
+          emptyMessage: "No non-compliant production logs found for this period."
+        },
+        {
+          title: "Non-Compliant Delivery Logs",
+          columns: ["Time", "Supplier", "Non-Compliant Details", "Corrective Action", "Received By", "Vehicle Reg"],
+          data: nonCompliantDeliveries,
+          emptyMessage: "No non-compliant delivery logs found for this period."
+        },
+        {
+          title: "Non-Compliant Temperature Logs",
+          columns: ["Appliance", "Temp (°C)", "Time", "Expected Range", "Corrective Action", "Logged By"],
+          data: nonCompliantTemperatures,
+          emptyMessage: "No non-compliant temperature logs found for this period."
+        }
+      ]
+    };
+    
+    generatePdfForReport(reportData, "Non_Compliant");
   };
 
   return (
@@ -361,6 +438,6 @@ export default function ReportsPage() {
     </div>
   );
 }
-
+    
 
     
