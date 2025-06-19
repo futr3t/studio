@@ -16,19 +16,26 @@ import {
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { LogoIcon } from "@/components/icons/logo-icon";
+import { useData } from "@/context/DataContext";
 
-const navItems = [
+const navItemsBase = [
   { href: "/", label: "Dashboard", icon: LayoutDashboard },
   { href: "/production", label: "Production", icon: Factory },
   { href: "/deliveries", label: "Deliveries", icon: Truck },
   { href: "/temperatures", label: "Temperatures", icon: Thermometer },
   { href: "/cleaning", label: "Cleaning", icon: Sparkles },
   { href: "/reports", label: "Reports", icon: FileText },
-  { href: "/settings", label: "Settings", icon: SettingsIcon },
 ];
+
+const settingsNavItem = { href: "/settings", label: "Settings", icon: SettingsIcon };
 
 export function MainNav() {
   const pathname = usePathname();
+  const { currentUser } = useData();
+
+  const navItems = currentUser?.role === 'admin' 
+    ? [...navItemsBase, settingsNavItem] 
+    : navItemsBase;
 
   return (
     <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">

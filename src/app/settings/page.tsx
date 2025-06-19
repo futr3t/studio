@@ -2,6 +2,7 @@
 "use client";
 
 import React, { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import { MainNav } from "@/components/layout/main-nav";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -9,7 +10,7 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { PlusCircle, Edit2, Trash2, ListFilter, Building, Thermometer, SparklesIcon, Save, Users } from "lucide-react";
+import { PlusCircle, Edit2, Trash2, ListFilter, Building, Thermometer, SparklesIcon, Save, Users, Loader2 } from "lucide-react";
 import type { Supplier, Appliance, CleaningTask, CleaningFrequency, User, TrainingRecord, SystemParameters } from "@/lib/types";
 import {
   Dialog,
@@ -88,47 +89,47 @@ export default function SettingsPage() {
     cleaningTasks, addCleaningTaskDefinition, updateCleaningTaskDefinition, deleteCleaningTaskDefinition,
     users, addUser, updateUser, deleteUser,
     systemParameters, updateSystemParameters: updateSystemParametersInContext,
+    currentUser
   } = useData();
   
   const { toast } = useToast();
+  const router = useRouter();
 
   const [dialogOpen, setDialogOpen] = useState(false);
   const [currentForm, setCurrentForm] = useState<"supplier" | "appliance" | "cleaningTask" | "user" | null>(null);
   const [editingItem, setEditingItem] = useState<any | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
 
   const supplierForm = useForm<SupplierFormData>({ resolver: zodResolver(supplierSchema) });
   const applianceForm = useForm<ApplianceFormData>({ resolver: zodResolver(applianceSchema) });
   const cleaningTaskForm = useForm<CleaningTaskFormData>({ resolver: zodResolver(cleaningTaskSchema) });
   const userForm = useForm<UserFormData>({ resolver: zodResolver(userSchema) });
 
-  // Form for system parameters
   const systemParamsForm = useForm<SystemParametersFormData>({
     resolver: zodResolver(systemParametersSchema),
-    defaultValues: {
-      fridgeMinTemp: systemParameters.temperatureRanges.fridge.min,
-      fridgeMaxTemp: systemParameters.temperatureRanges.fridge.max,
-      freezerMinTemp: systemParameters.temperatureRanges.freezer.min,
-      freezerMaxTemp: systemParameters.temperatureRanges.freezer.max,
-      hotHoldMinTemp: systemParameters.temperatureRanges.hotHold.min,
-      hotHoldMaxTemp: systemParameters.temperatureRanges.hotHold.max,
-      emailAlerts: systemParameters.notifications.emailAlerts,
-      smsAlerts: systemParameters.notifications.smsAlerts,
-    }
   });
 
-  // Effect to reset form when systemParameters from context change
   useEffect(() => {
-    systemParamsForm.reset({
-      fridgeMinTemp: systemParameters.temperatureRanges.fridge.min,
-      fridgeMaxTemp: systemParameters.temperatureRanges.fridge.max,
-      freezerMinTemp: systemParameters.temperatureRanges.freezer.min,
-      freezerMaxTemp: systemParameters.temperatureRanges.freezer.max,
-      hotHoldMinTemp: systemParameters.temperatureRanges.hotHold.min,
-      hotHoldMaxTemp: systemParameters.temperatureRanges.hotHold.max,
-      emailAlerts: systemParameters.notifications.emailAlerts,
-      smsAlerts: systemParameters.notifications.smsAlerts,
-    });
-  }, [systemParameters, systemParamsForm]);
+    if (currentUser) {
+      if (currentUser.role !== 'admin') {
+        toast({ title: "Access Denied", description: "You do not have permission to view this page.", variant: "destructive"});
+        router.push('/');
+      } else {
+        systemParamsForm.reset({
+          fridgeMinTemp: systemParameters.temperatureRanges.fridge.min,
+          fridgeMaxTemp: systemParameters.temperatureRanges.fridge.max,
+          freezerMinTemp: systemParameters.temperatureRanges.freezer.min,
+          freezerMaxTemp: systemParameters.temperatureRanges.freezer.max,
+          hotHoldMinTemp: systemParameters.temperatureRanges.hotHold.min,
+          hotHoldMaxTemp: systemParameters.temperatureRanges.hotHold.max,
+          emailAlerts: systemParameters.notifications.emailAlerts,
+          smsAlerts: systemParameters.notifications.smsAlerts,
+        });
+        setIsLoading(false);
+      }
+    }
+    // If currentUser is null, it's still loading in DataContext, so wait.
+  }, [currentUser, router, systemParameters, systemParamsForm, toast]);
 
 
   const parseTrainingRecords = (recordsString?: string): TrainingRecord[] => {
@@ -224,8 +225,30 @@ export default function SettingsPage() {
       },
     };
     updateSystemParametersInContext(newSystemParams);
-    // Toast is handled in DataContext's updateSystemParameters
   };
+
+  if (isLoading) {
+    return (
+      <div className="flex flex-col min-h-screen">
+        <MainNav />
+        <main className="flex-1 flex items-center justify-center">
+          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        </main>
+      </div>
+    );
+  }
+  
+  if (currentUser?.role !== 'admin') {
+     // This case should ideally be handled by the redirect, but as a fallback:
+    return (
+       <div className="flex flex-col min-h-screen">
+        <MainNav />
+        <main className="flex-1 flex items-center justify-center">
+          <p>Access Denied. Redirecting...</p>
+        </main>
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col min-h-screen">
@@ -474,4 +497,3 @@ export default function SettingsPage() {
     </div>
   );
 }
-

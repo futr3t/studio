@@ -126,3 +126,53 @@ export interface SystemParameters {
     smsAlerts: boolean;
   };
 }
+
+export interface DataContextType {
+  suppliers: Supplier[];
+  appliances: Appliance[];
+  productionLogs: ProductionLog[];
+  deliveryLogs: DeliveryLog[];
+  temperatureLogs: TemperatureLog[];
+  cleaningTasks: CleaningTask[]; // Definitions
+  cleaningChecklistItems: CleaningChecklistItem[]; // Instances
+  users: User[];
+  currentUser: User | null;
+  systemParameters: SystemParameters;
+  getRecentActivities: (limit?: number) => ActivityFeedItem[];
+
+  setCurrentUser: (user: User | null) => void;
+  updateSystemParameters: (newParams: SystemParameters) => void;
+
+  addSupplier: (supplierData: Omit<Supplier, 'id'>) => void;
+  updateSupplier: (updatedSupplier: Supplier) => void;
+  deleteSupplier: (supplierId: string) => void;
+
+  addAppliance: (applianceData: Omit<Appliance, 'id'>) => void;
+  updateAppliance: (updatedAppliance: Appliance) => void;
+  deleteAppliance: (applianceId: string) => void;
+
+  addProductionLog: (logData: Omit<ProductionLog, 'id' | 'logTime'>) => void;
+  updateProductionLog: (updatedLog: ProductionLog) => void;
+  deleteProductionLog: (logId: string) => void;
+
+  addDeliveryLog: (logData: Omit<DeliveryLog, 'id' | 'deliveryTime'>) => void;
+  updateDeliveryLog: (updatedLog: DeliveryLog) => void;
+  deleteDeliveryLog: (logId: string) => void;
+
+  addTemperatureLog: (logData: Omit<TemperatureLog, 'id' | 'logTime' | 'isCompliant'>, appliance: Appliance) => void;
+  updateTemperatureLog: (updatedLogData: Omit<TemperatureLog, 'isCompliant'>, appliance: Appliance) => void;
+  deleteTemperatureLog: (logId: string) => void;
+
+  addCleaningTaskDefinition: (taskData: Omit<CleaningTask, 'id'>) => void;
+  updateCleaningTaskDefinition: (updatedTask: CleaningTask) => void;
+  deleteCleaningTaskDefinition: (taskId: string) => void;
+
+  updateCleaningChecklistItem: (updatedItem: CleaningChecklistItem) => void;
+  
+  addUser: (userData: Omit<User, 'id'>) => void;
+  updateUser: (updatedUser: User) => void;
+  deleteUser: (userId: string) => void;
+
+  findUserById: (userId: string) => User | undefined;
+  getApplianceEffectiveTempRange: (appliance: Appliance) => TemperatureRange | null;
+}
