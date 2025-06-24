@@ -39,12 +39,12 @@ export function MainNav() {
 
   return (
     <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-      <div className="flex h-16 items-center justify-between px-6 md:px-8">
-        <Link href="/" className="flex items-center space-x-2 text-primary">
-          <ShieldCheck className="h-8 w-8" />
-          <span className="font-bold text-xl font-headline">ChefCheck</span>
+      <div className="flex h-16 items-center justify-between px-4 md:px-8">
+        <Link href="/" className="flex items-center space-x-2 text-primary flex-shrink-0">
+          <ShieldCheck className="h-6 w-6 md:h-8 md:w-8" />
+          <span className="font-bold text-lg md:text-xl font-headline">ChefCheck</span>
         </Link>
-        <nav className="flex items-center space-x-1 ml-6"> {/* Added ml-6 for spacing */}
+        <nav className="flex items-center gap-1 ml-2 overflow-x-auto scrollbar-hide">
           {navItems.map((item) => (
             <Button
               key={item.href}
@@ -52,15 +52,15 @@ export function MainNav() {
               size="sm"
               asChild
               className={cn(
-                "text-sm font-medium transition-colors",
+                "text-xs md:text-sm font-medium transition-colors flex-shrink-0 px-2 md:px-3",
                 pathname === item.href
                   ? "text-primary hover:text-primary"
                   : "text-muted-foreground hover:text-foreground"
               )}
             >
-              <Link href={item.href}>
-                <item.icon className="mr-2 h-4 w-4" />
-                {item.label}
+              <Link href={item.href} className="flex items-center">
+                <item.icon className="mr-1 md:mr-2 h-3 w-3 md:h-4 md:w-4" />
+                <span className="hidden sm:inline">{item.label}</span>
               </Link>
             </Button>
           ))}

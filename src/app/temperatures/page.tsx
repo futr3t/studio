@@ -155,7 +155,7 @@ export default function TemperaturesPage() {
   return (
     <div className="flex flex-col min-h-screen">
       <MainNav />
-      <main className="flex-1 p-6 md:p-8 space-y-6">
+      <main className="flex-1 p-4 md:p-8 space-y-6">
         <h1 className="text-3xl font-bold font-headline tracking-tight">Temperature Logging</h1>
 
         <Card>
