@@ -1,7 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { withAdminAuth } from '@/lib/auth-middleware';
-import { createServerClient } from '@supabase/ssr';
-import { cookies } from 'next/headers';
 
 async function handler(request: NextRequest, context: { user: any }) {
   try {
@@ -17,17 +15,16 @@ async function handler(request: NextRequest, context: { user: any }) {
     // Convert username to email format for Supabase
     const email = `${username}@chefcheck.local`;
 
-    // Create Supabase admin client for user creation
-    const cookieStore = cookies();
-    const supabase = createServerClient(
+    // Create Supabase admin client for user creation (direct connection, no cookies needed)
+    const { createClient } = await import('@supabase/supabase-js');
+    const supabase = createClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!, // This needs to be set in environment
+      process.env.SUPABASE_SERVICE_ROLE_KEY!,
       {
-        cookies: {
-          get(name: string) {
-            return cookieStore.get(name)?.value;
-          },
-        },
+        auth: {
+          autoRefreshToken: false,
+          persistSession: false
+        }
       }
     );
 

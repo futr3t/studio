@@ -38,40 +38,18 @@ async function createAdminUser() {
     );
 
     if (adminExists) {
-      console.log('\n✅ Admin user already exists!');
+      console.log('\n🗑️ Removing existing admin user...');
       
-      // Check if the admin has a username for our login system
       const adminUser = existingUsers.users.find(user => user.user_metadata?.role === 'admin');
       
-      if (!adminUser.user_metadata?.username) {
-        console.log('🔧 Adding username to existing admin for login system...');
-        
-        // Update the admin user with a username
-        const { data: updatedUser, error: updateError } = await supabase.auth.admin.updateUserById(
-          adminUser.id,
-          {
-            user_metadata: {
-              ...adminUser.user_metadata,
-              username: 'admin'
-            }
-          }
-        );
-        
-        if (updateError) {
-          console.error('❌ Error updating admin user:', updateError.message);
-          return;
-        }
-        
-        console.log('✅ Admin user updated with username!');
+      const { error: deleteError } = await supabase.auth.admin.deleteUser(adminUser.id);
+      
+      if (deleteError) {
+        console.error('❌ Error deleting admin user:', deleteError.message);
+        return;
       }
       
-      console.log('\n🎉 Ready to test! Login with:');
-      console.log('   Username: admin');
-      console.log('   Password: [use the existing password]');
-      console.log('\n📝 Or login with email:');
-      console.log('   Email: futret@gmail.com');
-      console.log('   Password: [your existing password]');
-      return;
+      console.log('✅ Existing admin user deleted!');
     }
 
     // Create admin user
