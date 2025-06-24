@@ -4,7 +4,7 @@
 import React, { useMemo } from 'react';
 import Link from 'next/link';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { CheckCircle2, AlertTriangle, ListChecks, Thermometer as ThermometerIcon, Sparkles, Truck, Factory } from "lucide-react";
+import { CheckCircle2, AlertTriangle, ListChecks, Thermometer as ThermometerIcon, Sparkles, Truck, Factory, LayoutDashboard } from "lucide-react";
 import { MainNav } from "@/components/layout/main-nav";
 import {
   ChartContainer,

@@ -20,9 +20,14 @@ body {
 /* Enhanced card styles */
 @layer components {
   .card-enhanced {
-    @apply bg-white/70 backdrop-blur-sm border-white/20 shadow-lg shadow-black/5;
-    @apply hover:shadow-xl hover:shadow-black/8 transition-all duration-300;
+    @apply bg-white/70 backdrop-blur-sm border-white/20 shadow-lg;
+    @apply hover:shadow-xl transition-all duration-300;
     @apply hover:-translate-y-0.5;
+    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.05), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+  }
+  
+  .card-enhanced:hover {
+    box-shadow: 0 25px 25px -5px rgba(0, 0, 0, 0.08), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
   }
   
   .card-interactive {
