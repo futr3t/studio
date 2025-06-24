@@ -3,9 +3,14 @@ import { withAdminAuth } from '@/lib/auth-middleware';
 
 async function handler(request: NextRequest, context: { user: any }) {
   try {
-    const { username, password, userData } = await request.json();
+    console.log('🔧 Create user handler called');
+    const body = await request.json();
+    console.log('📝 Request body:', body);
+    
+    const { username, password, userData } = body;
 
     if (!username || !password || !userData?.name || !userData?.role) {
+      console.log('❌ Missing required fields:', { username: !!username, password: !!password, userData });
       return NextResponse.json(
         { error: 'Missing required fields' },
         { status: 400 }

@@ -45,6 +45,7 @@ export async function withAdminAuth(
 ) {
   return async function (request: NextRequest, params?: any) {
     try {
+      console.log('🔒 Admin auth middleware called');
       const cookieStore = cookies();
       const supabase = createServerClient(
         process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -59,6 +60,7 @@ export async function withAdminAuth(
       );
 
       const { data: { session }, error } = await supabase.auth.getSession();
+      console.log('📋 Session check:', { hasSession: !!session, hasUser: !!session?.user, error: error?.message });
 
       if (error || !session?.user) {
         return NextResponse.json(
