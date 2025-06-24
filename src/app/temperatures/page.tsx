@@ -260,7 +260,6 @@ export default function TemperaturesPage() {
         <Card>
           <CardHeader>
             <CardTitle>Recent Temperature Logs</CardTitle>
-            <CardDescription>History of recorded temperatures.</CardDescription>
           </CardHeader>
           <CardContent>
             <Table>

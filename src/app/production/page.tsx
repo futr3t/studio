@@ -232,7 +232,6 @@ export default function ProductionPage() {
         <Card>
           <CardHeader>
             <CardTitle>Logged Production Activities</CardTitle>
-            <CardDescription>Overview of all recorded production logs.</CardDescription>
           </CardHeader>
           <CardContent>
             <Table>

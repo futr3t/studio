@@ -128,7 +128,6 @@ export default function CleaningPage() {
             <div className="flex flex-col md:flex-row justify-between md:items-center gap-4">
               <div>
                 <CardTitle>Cleaning Schedule</CardTitle>
-                <CardDescription>Manage and track all cleaning tasks.</CardDescription>
               </div>
               <div className="flex items-center gap-2 flex-wrap">
                 <Select value={filterFrequency} onValueChange={(value) => setFilterFrequency(value as CleaningFrequency | 'all')}>

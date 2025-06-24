@@ -139,14 +139,14 @@ export default function DashboardPage() {
           </Link>
         </div>
 
-        <div className="grid gap-6 lg:grid-cols-2">
+        <div className="grid gap-6 xl:grid-cols-2">
           <Card>
             <CardHeader>
               <CardTitle>Compliance Trend</CardTitle>
               <CardDescription>Monthly compliance vs. non-compliance logs</CardDescription>
             </CardHeader>
             <CardContent>
-              <ChartContainer config={chartConfig} className="h-[300px] w-full">
+              <ChartContainer config={chartConfig} className="h-[250px] md:h-[300px] w-full min-w-0">
                 <RechartsBarChart accessibilityLayer data={complianceData.chartData}>
                   <CartesianGrid vertical={false} />
                   <XAxis

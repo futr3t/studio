@@ -332,7 +332,6 @@ export default function ReportsPage() {
           <Card>
             <CardHeader>
               <CardTitle>General Compliance Report</CardTitle>
-              <CardDescription>Generate a comprehensive report for all logs within a selected date range.</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               <div>
@@ -385,7 +384,6 @@ export default function ReportsPage() {
           <Card>
             <CardHeader>
               <CardTitle>Non-Compliant Logs Report</CardTitle>
-              <CardDescription>Generate a report focusing on non-compliant logs and corrective actions.</CardDescription>
             </CardHeader>
              <CardContent className="space-y-4">
               <div>

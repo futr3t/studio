@@ -263,7 +263,6 @@ export default function DeliveriesPage() {
         <Card>
           <CardHeader>
             <CardTitle>Logged Deliveries</CardTitle>
-            <CardDescription>History of all received deliveries.</CardDescription>
           </CardHeader>
           <CardContent>
             <Table>

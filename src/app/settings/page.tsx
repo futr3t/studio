@@ -256,12 +256,27 @@ export default function SettingsPage() {
       <main className="flex-1 p-4 md:p-8 space-y-6">
         <h1 className="text-3xl font-bold font-headline tracking-tight">Settings</h1>
         <Tabs defaultValue="suppliers" className="w-full">
-          <TabsList className="grid w-full grid-cols-2 md:grid-cols-5">
-            <TabsTrigger value="suppliers"><Building className="mr-2 h-4 w-4 inline-block" />Suppliers</TabsTrigger>
-            <TabsTrigger value="appliances"><Thermometer className="mr-2 h-4 w-4 inline-block" />Appliances</TabsTrigger>
-            <TabsTrigger value="cleaning_tasks"><SparklesIcon className="mr-2 h-4 w-4 inline-block" />Cleaning Tasks</TabsTrigger>
-            <TabsTrigger value="users"><Users className="mr-2 h-4 w-4 inline-block" />Users</TabsTrigger>
-            <TabsTrigger value="parameters"><ListFilter className="mr-2 h-4 w-4 inline-block" />Parameters</TabsTrigger>
+          <TabsList className="grid w-full grid-cols-2 md:grid-cols-5 h-auto">
+            <TabsTrigger value="suppliers" className="flex-col md:flex-row h-auto py-2">
+              <Building className="h-4 w-4 mb-1 md:mb-0 md:mr-2" />
+              <span className="text-xs md:text-sm">Suppliers</span>
+            </TabsTrigger>
+            <TabsTrigger value="appliances" className="flex-col md:flex-row h-auto py-2">
+              <Thermometer className="h-4 w-4 mb-1 md:mb-0 md:mr-2" />
+              <span className="text-xs md:text-sm">Appliances</span>
+            </TabsTrigger>
+            <TabsTrigger value="cleaning_tasks" className="flex-col md:flex-row h-auto py-2">
+              <SparklesIcon className="h-4 w-4 mb-1 md:mb-0 md:mr-2" />
+              <span className="text-xs md:text-sm">Cleaning</span>
+            </TabsTrigger>
+            <TabsTrigger value="users" className="flex-col md:flex-row h-auto py-2">
+              <Users className="h-4 w-4 mb-1 md:mb-0 md:mr-2" />
+              <span className="text-xs md:text-sm">Users</span>
+            </TabsTrigger>
+            <TabsTrigger value="parameters" className="flex-col md:flex-row h-auto py-2">
+              <ListFilter className="h-4 w-4 mb-1 md:mb-0 md:mr-2" />
+              <span className="text-xs md:text-sm">Settings</span>
+            </TabsTrigger>
           </TabsList>
 
           <TabsContent value="suppliers">
