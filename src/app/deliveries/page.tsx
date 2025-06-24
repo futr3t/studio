@@ -262,7 +262,7 @@ export default function DeliveriesPage() {
 
         <Card>
           <CardHeader>
-            <CardTitle>Logged Deliveries</CardTitle>
+            <CardTitle>Recent Deliveries</CardTitle>
           </CardHeader>
           <CardContent>
             <Table>

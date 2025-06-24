@@ -231,7 +231,7 @@ export default function ProductionPage() {
 
         <Card>
           <CardHeader>
-            <CardTitle>Logged Production Activities</CardTitle>
+            <CardTitle>Production History</CardTitle>
           </CardHeader>
           <CardContent>
             <Table>

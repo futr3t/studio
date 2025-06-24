@@ -161,7 +161,7 @@ export default function TemperaturesPage() {
         <Card>
           <CardHeader>
             <CardTitle>Log Temperatures by Appliance</CardTitle>
-            <CardDescription>Click on an appliance to log its current temperature. Expected ranges are based on appliance-specific settings or system defaults by type (Fridge, Freezer, Hot Hold).</CardDescription>
+            <CardDescription>Select an appliance to record its current temperature reading.</CardDescription>
           </CardHeader>
           <CardContent className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
             {appliances.map((appliance) => (

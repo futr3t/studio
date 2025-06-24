@@ -267,7 +267,7 @@ export default function SettingsPage() {
             </TabsTrigger>
             <TabsTrigger value="cleaning_tasks" className="flex-col md:flex-row h-auto py-2">
               <SparklesIcon className="h-4 w-4 mb-1 md:mb-0 md:mr-2" />
-              <span className="text-xs md:text-sm">Cleaning</span>
+              <span className="text-xs md:text-sm">Tasks</span>
             </TabsTrigger>
             <TabsTrigger value="users" className="flex-col md:flex-row h-auto py-2">
               <Users className="h-4 w-4 mb-1 md:mb-0 md:mr-2" />
@@ -275,7 +275,7 @@ export default function SettingsPage() {
             </TabsTrigger>
             <TabsTrigger value="parameters" className="flex-col md:flex-row h-auto py-2">
               <ListFilter className="h-4 w-4 mb-1 md:mb-0 md:mr-2" />
-              <span className="text-xs md:text-sm">Settings</span>
+              <span className="text-xs md:text-sm">System</span>
             </TabsTrigger>
           </TabsList>
 
@@ -305,7 +305,7 @@ export default function SettingsPage() {
 
           <TabsContent value="appliances">
             <Card>
-              <CardHeader><div className="flex justify-between items-center"><div><CardTitle>Manage Appliances</CardTitle><CardDescription>Add, edit, or remove appliances used for temperature logging. Specify type (e.g. Fridge, Freezer, Oven, Hot Hold) for system parameter fallback.</CardDescription></div><Button onClick={() => openDialog("appliance")}><PlusCircle className="mr-2 h-4 w-4" /> Add Appliance</Button></div></CardHeader>
+              <CardHeader><div className="flex justify-between items-center"><div><CardTitle>Manage Appliances</CardTitle><CardDescription>Manage appliances for temperature monitoring.</CardDescription></div><Button onClick={() => openDialog("appliance")}><PlusCircle className="mr-2 h-4 w-4" /> Add Appliance</Button></div></CardHeader>
               <CardContent>
                  <Table>
                   <TableHeader><TableRow><TableHead>Name</TableHead><TableHead>Location</TableHead><TableHead>Type</TableHead><TableHead>Min Temp (°C)</TableHead><TableHead>Max Temp (°C)</TableHead><TableHead className="text-right">Actions</TableHead></TableRow></TableHeader>
@@ -329,7 +329,7 @@ export default function SettingsPage() {
 
           <TabsContent value="cleaning_tasks">
              <Card>
-              <CardHeader><div className="flex justify-between items-center"><div><CardTitle>Manage Cleaning Task Definitions</CardTitle><CardDescription>Define tasks for the cleaning checklist. These are templates.</CardDescription></div><Button onClick={() => openDialog("cleaningTask")}><PlusCircle className="mr-2 h-4 w-4" /> Add Task Definition</Button></div></CardHeader>
+              <CardHeader><div className="flex justify-between items-center"><div><CardTitle>Manage Cleaning Task Definitions</CardTitle><CardDescription>Create and manage cleaning task templates.</CardDescription></div><Button onClick={() => openDialog("cleaningTask")}><PlusCircle className="mr-2 h-4 w-4" /> Add Task Definition</Button></div></CardHeader>
               <CardContent>
                  <Table>
                   <TableHeader><TableRow><TableHead>Name</TableHead><TableHead>Area</TableHead><TableHead>Frequency</TableHead><TableHead>Description</TableHead><TableHead className="text-right">Actions</TableHead></TableRow></TableHeader>
