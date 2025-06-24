@@ -39,7 +39,7 @@ export function MainNav() {
 
   return (
     <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-      <div className="container flex h-16 items-center justify-between">
+      <div className="flex h-16 items-center justify-between px-6 md:px-8">
         <Link href="/" className="flex items-center space-x-2 text-primary">
           <ShieldCheck className="h-8 w-8" />
           <span className="font-bold text-xl font-headline">ChefCheck</span>
