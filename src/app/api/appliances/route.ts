@@ -1,11 +1,23 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
-import { supabase } from '@/lib/supabase';
 import type { Appliance } from '@/lib/types';
 import { withAuth, withAdminAuth } from '@/lib/auth-middleware';
 
 async function getAppliancesHandler(request: NextRequest, context: { user: any }) {
   try {
+    // Create authenticated Supabase client
+    const { createClient } = await import('@supabase/supabase-js');
+    const supabase = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!,
+      {
+        auth: {
+          autoRefreshToken: false,
+          persistSession: false
+        }
+      }
+    );
+
     const { data: appliances, error } = await supabase
       .from('appliances')
       .select('*')
@@ -41,6 +53,19 @@ async function createApplianceHandler(request: NextRequest, context: { user: any
     if (!body.name || !body.location || !body.type) {
       return NextResponse.json({ message: 'Name, location, and type are required' }, { status: 400 });
     }
+
+    // Create authenticated Supabase client
+    const { createClient } = await import('@supabase/supabase-js');
+    const supabase = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!,
+      {
+        auth: {
+          autoRefreshToken: false,
+          persistSession: false
+        }
+      }
+    );
 
     const { data: appliance, error } = await supabase
       .from('appliances')

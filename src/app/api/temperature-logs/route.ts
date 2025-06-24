@@ -1,6 +1,5 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
-import { supabase } from '@/lib/supabase';
 import type { TemperatureLog, Appliance, SystemParameters } from '@/lib/types';
 import { withAuth } from '@/lib/auth-middleware';
 // For compliance check, we need system parameters. For now, hardcode or fetch from a simplified source.
@@ -27,6 +26,19 @@ const getApplianceEffectiveTempRange = (appliance: Appliance): { min: number; ma
 
 async function getTemperatureLogsHandler(request: NextRequest, context: { user: any }) {
   try {
+    // Create authenticated Supabase client
+    const { createClient } = await import('@supabase/supabase-js');
+    const supabase = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!,
+      {
+        auth: {
+          autoRefreshToken: false,
+          persistSession: false
+        }
+      }
+    );
+
     const { data: temperatureLogs, error } = await supabase
       .from('temperature_logs')
       .select('*')
@@ -63,6 +75,19 @@ async function createTemperatureLogHandler(request: NextRequest, context: { user
     if (!body.applianceId || typeof body.temperature !== 'number') {
       return NextResponse.json({ message: 'Appliance ID and temperature are required' }, { status: 400 });
     }
+
+    // Create authenticated Supabase client
+    const { createClient } = await import('@supabase/supabase-js');
+    const supabase = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!,
+      {
+        auth: {
+          autoRefreshToken: false,
+          persistSession: false
+        }
+      }
+    );
 
     // Fetch appliance for compliance check
     const { data: appliance, error: applianceError } = await supabase
