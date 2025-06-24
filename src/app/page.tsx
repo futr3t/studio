@@ -20,6 +20,7 @@ import { format, parseISO } from 'date-fns';
 import { enUS } from 'date-fns/locale';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
+import { AuthWrapper } from '@/components/auth/AuthWrapper';
 
 
 const chartConfig = {
@@ -92,9 +93,10 @@ export default function DashboardPage() {
 
 
   return (
-    <div className="flex flex-col min-h-screen">
-      <MainNav />
-      <main className="flex-1 p-4 md:p-8 space-y-6">
+    <AuthWrapper>
+      <div className="flex flex-col min-h-screen">
+        <MainNav />
+        <main className="flex-1 p-4 md:p-8 space-y-6">
         <div className="flex items-center space-x-3 mb-2">
           <div className="p-3 bg-primary/10 rounded-xl">
             <LayoutDashboard className="h-6 w-6 text-primary" />
@@ -230,5 +232,6 @@ export default function DashboardPage() {
         </div>
       </main>
     </div>
+    </AuthWrapper>
   );
 }
