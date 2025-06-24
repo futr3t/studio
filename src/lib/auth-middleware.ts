@@ -46,6 +46,12 @@ export async function withAdminAuth(
   return async function (request: NextRequest, params?: any) {
     try {
       console.log('🔒 Admin auth middleware called');
+      console.log('🔧 Environment check:', {
+        hasUrl: !!process.env.NEXT_PUBLIC_SUPABASE_URL,
+        hasAnonKey: !!process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
+        url: process.env.NEXT_PUBLIC_SUPABASE_URL?.substring(0, 30) + '...'
+      });
+      
       const cookieStore = cookies();
       const supabase = createServerClient(
         process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -53,7 +59,9 @@ export async function withAdminAuth(
         {
           cookies: {
             get(name: string) {
-              return cookieStore.get(name)?.value;
+              const value = cookieStore.get(name)?.value;
+              console.log(`🍪 Cookie ${name}:`, value ? 'exists' : 'missing');
+              return value;
             },
           },
         }
@@ -70,16 +78,21 @@ export async function withAdminAuth(
       }
 
       const userRole = session.user.user_metadata?.role;
+      console.log('👤 User role check:', { userRole, userId: session.user.id });
+      
       if (userRole !== 'admin') {
+        console.log('❌ Access denied - not admin');
         return NextResponse.json(
           { error: 'Forbidden - Admin access required' }, 
           { status: 403 }
         );
       }
 
+      console.log('✅ Admin access granted, calling handler');
       return await handler(request, { user: session.user });
     } catch (error) {
-      console.error('Admin auth middleware error:', error);
+      console.error('❌ Admin auth middleware error:', error);
+      console.error('Error stack:', error instanceof Error ? error.stack : 'No stack trace');
       return NextResponse.json(
         { error: 'Internal server error' }, 
         { status: 500 }
