@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import { supabase } from '@/lib/supabase';
 import type { TemperatureLog, Appliance, SystemParameters } from '@/lib/types';
+import { withAuth } from '@/lib/auth-middleware';
 // For compliance check, we need system parameters. For now, hardcode or fetch from a simplified source.
 // This should ideally come from a system parameters API or be passed if context is available.
 const currentSystemParameters: SystemParameters = {
@@ -24,7 +25,7 @@ const getApplianceEffectiveTempRange = (appliance: Appliance): { min: number; ma
     return null;
 };
 
-export async function GET(request: NextRequest) {
+async function getTemperatureLogsHandler(request: NextRequest, context: { user: any }) {
   try {
     const { data: temperatureLogs, error } = await supabase
       .from('temperature_logs')
@@ -54,7 +55,7 @@ export async function GET(request: NextRequest) {
   }
 }
 
-export async function POST(request: NextRequest) {
+async function createTemperatureLogHandler(request: NextRequest, context: { user: any }) {
   try {
     const body = await request.json() as Omit<TemperatureLog, 'id' | 'logTime' | 'isCompliant'> & { applianceId: string };
     
@@ -92,6 +93,9 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    // Use authenticated user's info
+    const userName = context.user.user_metadata?.name || context.user.user_metadata?.username || 'Unknown User';
+
     const { data: temperatureLog, error } = await supabase
       .from('temperature_logs')
       .insert({
@@ -100,7 +104,7 @@ export async function POST(request: NextRequest) {
         log_time: new Date().toISOString(),
         is_compliant: isCompliant,
         corrective_action: body.correctiveAction || null,
-        logged_by: body.loggedBy || null,
+        logged_by: userName,
       })
       .select()
       .single();
@@ -128,3 +132,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ message: errorMessage }, { status: 500 });
   }
 }
+
+// All authenticated users can read and create temperature logs
+export const GET = withAuth(getTemperatureLogsHandler);
+export const POST = withAuth(createTemperatureLogHandler);

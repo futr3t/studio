@@ -2,8 +2,9 @@ import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import { supabase } from '@/lib/supabase';
 import type { Appliance } from '@/lib/types';
+import { withAuth, withAdminAuth } from '@/lib/auth-middleware';
 
-export async function GET(request: NextRequest) {
+async function getAppliancesHandler(request: NextRequest, context: { user: any }) {
   try {
     const { data: appliances, error } = await supabase
       .from('appliances')
@@ -32,7 +33,7 @@ export async function GET(request: NextRequest) {
   }
 }
 
-export async function POST(request: NextRequest) {
+async function createApplianceHandler(request: NextRequest, context: { user: any }) {
   try {
     const body = await request.json() as Omit<Appliance, 'id'>;
     
@@ -75,3 +76,8 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ message: errorMessage }, { status: 500 });
   }
 }
+
+// GET: All authenticated users can read appliances
+// POST: Only admins can create appliances
+export const GET = withAuth(getAppliancesHandler);
+export const POST = withAdminAuth(createApplianceHandler);

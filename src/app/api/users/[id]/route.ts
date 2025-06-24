@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import { supabase } from '@/lib/supabase';
 import type { User, TrainingRecord } from '@/lib/types';
+import { withAdminAuth } from '@/lib/auth-middleware';
 
 // Helper function to convert training records from database format
 function convertTrainingRecordsFromDb(dbRecords: any[] | null): TrainingRecord[] {
@@ -25,8 +26,9 @@ function convertTrainingRecordsToDb(records: TrainingRecord[] | undefined): any[
   }));
 }
 
-export async function GET(
+async function getUserHandler(
   request: NextRequest,
+  context: { user: any },
   { params }: { params: { id: string } }
 ) {
   try {
@@ -60,8 +62,9 @@ export async function GET(
   }
 }
 
-export async function PUT(
+async function updateUserHandler(
   request: NextRequest,
+  context: { user: any },
   { params }: { params: { id: string } }
 ) {
   try {
@@ -111,8 +114,9 @@ export async function PUT(
   }
 }
 
-export async function DELETE(
+async function deleteUserHandler(
   request: NextRequest,
+  context: { user: any },
   { params }: { params: { id: string } }
 ) {
   try {
@@ -135,3 +139,8 @@ export async function DELETE(
     return NextResponse.json({ message: 'Failed to delete user' }, { status: 500 });
   }
 }
+
+// Apply admin authentication to all routes
+export const GET = withAdminAuth(getUserHandler);
+export const PUT = withAdminAuth(updateUserHandler);
+export const DELETE = withAdminAuth(deleteUserHandler);

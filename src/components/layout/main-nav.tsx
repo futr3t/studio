@@ -29,6 +29,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { PasswordChangeForm } from "@/components/auth/PasswordChangeForm";
 
 const navItemsBase = [
   { href: "/", label: "Dashboard", icon: LayoutDashboard },
@@ -46,7 +47,7 @@ export function MainNav() {
   const { user, signOut } = useAuth();
 
   const userRole = user?.user_metadata?.role as 'admin' | 'staff' | undefined;
-  const userName = user?.user_metadata?.name || user?.email || 'User';
+  const userName = user?.user_metadata?.name || user?.user_metadata?.username || user?.email?.replace('@chefcheck.local', '') || 'User';
 
   const navItems = userRole === 'admin' 
     ? [...navItemsBase, settingsNavItem] 
@@ -111,6 +112,9 @@ export function MainNav() {
                   <User className="mr-2 h-4 w-4" />
                   Profile Settings
                 </Link>
+              </DropdownMenuItem>
+              <DropdownMenuItem asChild>
+                <PasswordChangeForm />
               </DropdownMenuItem>
               <DropdownMenuSeparator />
               <DropdownMenuItem 

@@ -33,6 +33,8 @@ import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover
 import { format, parse, isValid } from 'date-fns';
 import { enUS } from 'date-fns/locale';
 import { useData } from '@/context/DataContext';
+import { AuthWrapper } from '@/components/auth/AuthWrapper';
+import { useAuth } from '@/context/AuthContext';
 
 // Schemas for forms
 const supplierSchema = z.object({
@@ -62,9 +64,9 @@ type CleaningTaskFormData = z.infer<typeof cleaningTaskSchema>;
 
 const userSchema = z.object({
   name: z.string().min(1, "User name is required"),
-  email: z.string().email("Invalid email address"),
+  username: z.string().min(2, "Username must be at least 2 characters"),
   role: z.enum(['admin', 'staff']),
-  trainingRecords: z.string().optional(), // Raw string from textarea
+  password: z.string().min(6, "Password must be at least 6 characters"),
 });
 type UserFormData = z.infer<typeof userSchema>;
 
@@ -89,9 +91,9 @@ export default function SettingsPage() {
     cleaningTasks, addCleaningTaskDefinition, updateCleaningTaskDefinition, deleteCleaningTaskDefinition,
     users, addUser, updateUser, deleteUser,
     systemParameters, updateSystemParameters: updateSystemParametersInContext,
-    currentUser
   } = useData();
   
+  const { user: currentAuthUser, createUser } = useAuth();
   const { toast } = useToast();
   const router = useRouter();
 
@@ -110,8 +112,9 @@ export default function SettingsPage() {
   });
 
   useEffect(() => {
-    if (currentUser) {
-      if (currentUser.role !== 'admin') {
+    if (currentAuthUser) {
+      const userRole = currentAuthUser.user_metadata?.role;
+      if (userRole !== 'admin') {
         toast({ title: "Access Denied", description: "You do not have permission to view this page.", variant: "destructive"});
         router.push('/');
       } else {
@@ -128,26 +131,10 @@ export default function SettingsPage() {
         setIsLoading(false);
       }
     }
-    // If currentUser is null, it's still loading in DataContext, so wait.
-  }, [currentUser, router, systemParameters, systemParamsForm, toast]);
+    // If currentAuthUser is null, it's still loading in AuthContext, so wait.
+  }, [currentAuthUser, router, systemParameters, systemParamsForm, toast]);
 
 
-  const parseTrainingRecords = (recordsString?: string): TrainingRecord[] => {
-    if (!recordsString) return [];
-    return recordsString.split('\n').map(line => line.trim()).filter(line => line).map(line => {
-      const parts = line.split(';').map(part => part.trim());
-      const name = parts[0] || "Unnamed Record";
-      const dateCompleted = parts[1] || "";
-      const expiryDate = parts[2] || undefined;
-      const certificateUrl = parts[3] || undefined;
-      return { name, dateCompleted, expiryDate, certificateUrl };
-    }).filter(record => record.name && record.dateCompleted);
-  };
-
-  const formatTrainingRecordsForTextarea = (records?: TrainingRecord[]): string => {
-    if (!records) return "";
-    return records.map(r => `${r.name};${r.dateCompleted};${r.expiryDate || ''};${r.certificateUrl || ''}`).join('\n');
-  };
 
   const openDialog = (formType: "supplier" | "appliance" | "cleaningTask" | "user", itemToEdit: any | null = null) => {
     setCurrentForm(formType);
@@ -155,7 +142,7 @@ export default function SettingsPage() {
     if (formType === "supplier") supplierForm.reset(itemToEdit || {name: "", contactPerson: "", phone: "", email: ""});
     if (formType === "appliance") applianceForm.reset(itemToEdit || {name: "", location: "", type: "", minTemp: undefined, maxTemp: undefined});
     if (formType === "cleaningTask") cleaningTaskForm.reset(itemToEdit || {name: "", area: "", frequency: "daily", description: ""});
-    if (formType === "user") userForm.reset(itemToEdit ? {...itemToEdit, trainingRecords: formatTrainingRecordsForTextarea(itemToEdit.trainingRecords)} : {name: "", email: "", role: "staff", trainingRecords: ""});
+    if (formType === "user") userForm.reset(itemToEdit ? {...itemToEdit, password: ""} : {name: "", username: "", role: "staff", password: ""});
     setDialogOpen(true);
   };
 
@@ -186,16 +173,30 @@ export default function SettingsPage() {
     setDialogOpen(false);
   };
 
-  const handleUserSubmit: SubmitHandler<UserFormData> = (data) => {
-    const parsedRecords = parseTrainingRecords(data.trainingRecords);
-    const userData = { ...data, trainingRecords: parsedRecords };
-
+  const handleUserSubmit: SubmitHandler<UserFormData> = async (data) => {
     if (editingItem) {
-      updateUser({ ...editingItem, ...userData });
+      // For editing existing users, use the old system
+      updateUser({ ...editingItem, ...data });
+      setDialogOpen(false);
     } else {
-      addUser(userData);
+      // For creating new users, use Supabase auth
+      const result = await createUser(data.username, data.password, {
+        name: data.name,
+        role: data.role,
+      });
+      
+      if (!result.error) {
+        // Also add to local data context for immediate UI update
+        addUser({ 
+          id: `temp-${Date.now()}`, // Temporary ID
+          name: data.name, 
+          email: `${data.username}@chefcheck.local`, // Convert username to email format for display
+          role: data.role,
+          trainingRecords: []
+        });
+        setDialogOpen(false);
+      }
     }
-    setDialogOpen(false);
   };
 
   const handleDeleteItem = (type: "supplier" | "appliance" | "cleaningTask" | "user", id: string) => {
@@ -238,7 +239,8 @@ export default function SettingsPage() {
     );
   }
   
-  if (currentUser?.role !== 'admin') {
+  const userRole = currentAuthUser?.user_metadata?.role;
+  if (userRole !== 'admin') {
      // This case should ideally be handled by the redirect, but as a fallback:
     return (
        <div className="flex flex-col min-h-screen">
@@ -251,8 +253,9 @@ export default function SettingsPage() {
   }
 
   return (
-    <div className="flex flex-col min-h-screen">
-      <MainNav />
+    <AuthWrapper>
+      <div className="flex flex-col min-h-screen">
+        <MainNav />
       <main className="flex-1 p-4 md:p-8 space-y-6">
         <h1 className="text-3xl font-bold font-headline tracking-tight">Settings</h1>
         <Tabs defaultValue="suppliers" className="w-full">
@@ -357,11 +360,11 @@ export default function SettingsPage() {
               <CardHeader><div className="flex justify-between items-center"><div><CardTitle>Manage Users</CardTitle><CardDescription>Add, edit, or remove users and manage their roles.</CardDescription></div><Button onClick={() => openDialog("user")}><PlusCircle className="mr-2 h-4 w-4" /> Add User</Button></div></CardHeader>
               <CardContent>
                 <Table>
-                  <TableHeader><TableRow><TableHead>Name</TableHead><TableHead>Email</TableHead><TableHead>Role</TableHead><TableHead>Training Records</TableHead><TableHead className="text-right">Actions</TableHead></TableRow></TableHeader>
+                  <TableHeader><TableRow><TableHead>Name</TableHead><TableHead>Username</TableHead><TableHead>Role</TableHead><TableHead>Training Records</TableHead><TableHead className="text-right">Actions</TableHead></TableRow></TableHeader>
                   <TableBody>
                     {users.map(user => (
                       <TableRow key={user.id}>
-                        <TableCell>{user.name}</TableCell><TableCell>{user.email}</TableCell>
+                        <TableCell>{user.name}</TableCell><TableCell>{user.email?.replace('@chefcheck.local', '') || user.email}</TableCell>
                         <TableCell><Badge variant={user.role === 'admin' ? "default" : "secondary"}>{user.role.charAt(0).toUpperCase() + user.role.slice(1)}</Badge></TableCell>
                         <TableCell>
                           <Popover>
@@ -488,7 +491,7 @@ export default function SettingsPage() {
             {currentForm === "user" && (
               <form onSubmit={userForm.handleSubmit(handleUserSubmit)} className="space-y-4">
                 <Controller name="name" control={userForm.control} render={({ field, fieldState }) => (<div><Label htmlFor="u_name">Name</Label><Input id="u_name" {...field} />{fieldState.error && <p className="text-sm text-destructive">{fieldState.error.message}</p>}</div>)} />
-                <Controller name="email" control={userForm.control} render={({ field, fieldState }) => (<div><Label htmlFor="u_email">Email</Label><Input id="u_email" type="email" {...field} />{fieldState.error && <p className="text-sm text-destructive">{fieldState.error.message}</p>}</div>)} />
+                <Controller name="username" control={userForm.control} render={({ field, fieldState }) => (<div><Label htmlFor="u_username">Username</Label><Input id="u_username" type="text" {...field} placeholder="e.g. john, mary, chef1" />{fieldState.error && <p className="text-sm text-destructive">{fieldState.error.message}</p>}</div>)} />
                 <Controller name="role" control={userForm.control} render={({ field, fieldState }) => (
                   <div><Label htmlFor="u_role">Role</Label>
                     <Select onValueChange={field.onChange} value={field.value} defaultValue={field.value}>
@@ -497,12 +500,15 @@ export default function SettingsPage() {
                     </Select>
                     {fieldState.error && <p className="text-sm text-destructive">{fieldState.error.message}</p>}
                   </div>)} />
-                <Controller name="trainingRecords" control={userForm.control} render={({ field }) => (
-                  <div><Label htmlFor="u_training">Training Records</Label>
-                    <Textarea id="u_training" {...field} rows={4} placeholder="Enter one record per line: Name;DateCompleted (YYYY-MM-DD);ExpiryDate (YYYY-MM-DD);CertificateURL" />
-                    <p className="text-xs text-muted-foreground mt-1">Format: Name;YYYY-MM-DD;YYYY-MM-DD (optional);URL (optional)</p>
-                  </div>)} />
-                <DialogFooter><Button type="button" variant="outline" onClick={() => setDialogOpen(false)}>Cancel</Button><Button type="submit">Save User</Button></DialogFooter>
+                {!editingItem && (
+                  <Controller name="password" control={userForm.control} render={({ field, fieldState }) => (
+                    <div><Label htmlFor="u_password">Password</Label>
+                      <Input id="u_password" type="password" {...field} placeholder="Enter temporary password" />
+                      {fieldState.error && <p className="text-sm text-destructive">{fieldState.error.message}</p>}
+                      <p className="text-xs text-muted-foreground mt-1">User can change this after first login</p>
+                    </div>)} />
+                )}
+                <DialogFooter><Button type="button" variant="outline" onClick={() => setDialogOpen(false)}>Cancel</Button><Button type="submit">{editingItem ? "Update User" : "Create User"}</Button></DialogFooter>
               </form>
             )}
             </div>
@@ -510,5 +516,6 @@ export default function SettingsPage() {
         </Dialog>
       </main>
     </div>
+    </AuthWrapper>
   );
 }

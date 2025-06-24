@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import { supabase } from '@/lib/supabase';
 import type { User, TrainingRecord } from '@/lib/types';
+import { withAdminAuth } from '@/lib/auth-middleware';
 
 // Helper function to convert training records from database format
 function convertTrainingRecordsFromDb(dbRecords: any[] | null): TrainingRecord[] {
@@ -25,7 +26,7 @@ function convertTrainingRecordsToDb(records: TrainingRecord[] | undefined): any[
   }));
 }
 
-export async function GET(request: NextRequest) {
+async function getUsersHandler(request: NextRequest, context: { user: any }) {
   try {
     const { data: users, error } = await supabase
       .from('users')
@@ -53,7 +54,7 @@ export async function GET(request: NextRequest) {
   }
 }
 
-export async function POST(request: NextRequest) {
+async function createUserHandler(request: NextRequest, context: { user: any }) {
   try {
     const body = await request.json() as Omit<User, 'id'>;
     
@@ -94,3 +95,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ message: errorMessage }, { status: 500 });
   }
 }
+
+// Apply admin authentication to both routes
+export const GET = withAdminAuth(getUsersHandler);
+export const POST = withAdminAuth(createUserHandler);

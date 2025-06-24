@@ -9,10 +9,11 @@ interface AuthContextType {
   user: User | null;
   session: Session | null;
   loading: boolean;
-  signUp: (email: string, password: string, userData: { name: string; role: 'admin' | 'staff' }) => Promise<{ error: AuthError | null }>;
-  signIn: (email: string, password: string) => Promise<{ error: AuthError | null }>;
+  signIn: (username: string, password: string) => Promise<{ error: AuthError | null }>;
   signOut: () => Promise<void>;
   updateProfile: (updates: { name?: string; role?: 'admin' | 'staff' }) => Promise<{ error: Error | null }>;
+  updatePassword: (newPassword: string) => Promise<{ error: AuthError | null }>;
+  createUser: (username: string, password: string, userData: { name: string; role: 'admin' | 'staff' }) => Promise<{ error: AuthError | null }>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -61,50 +62,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     };
   }, [toast]);
 
-  const signUp = async (email: string, password: string, userData: { name: string; role: 'admin' | 'staff' }) => {
+
+  const signIn = async (username: string, password: string) => {
     try {
-      const { data, error } = await supabase.auth.signUp({
-        email,
-        password,
-        options: {
-          data: {
-            name: userData.name,
-            role: userData.role,
-          }
-        }
-      });
-
-      if (error) {
-        toast({
-          title: "Sign up failed",
-          description: error.message,
-          variant: "destructive"
-        });
-        return { error };
-      }
-
-      if (data.user && !data.session) {
-        toast({
-          title: "Check your email",
-          description: "We've sent you a verification link.",
-          className: "bg-accent text-accent-foreground"
-        });
-      }
-
-      return { error: null };
-    } catch (error) {
-      const authError = error as AuthError;
-      toast({
-        title: "Sign up failed",
-        description: authError.message,
-        variant: "destructive"
-      });
-      return { error: authError };
-    }
-  };
-
-  const signIn = async (email: string, password: string) => {
-    try {
+      // Convert username to email format for Supabase
+      // We'll use username@chefcheck.local as the email format
+      const email = `${username}@chefcheck.local`;
+      
       const { error } = await supabase.auth.signInWithPassword({
         email,
         password,
@@ -113,7 +77,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (error) {
         toast({
           title: "Sign in failed",
-          description: error.message,
+          description: "Invalid username or password",
           variant: "destructive"
         });
         return { error };
@@ -124,7 +88,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const authError = error as AuthError;
       toast({
         title: "Sign in failed",
-        description: authError.message,
+        description: "Invalid username or password",
         variant: "destructive"
       });
       return { error: authError };
@@ -175,14 +139,86 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
+  const updatePassword = async (newPassword: string) => {
+    try {
+      const { error } = await supabase.auth.updateUser({
+        password: newPassword
+      });
+
+      if (error) {
+        toast({
+          title: "Password update failed",
+          description: error.message,
+          variant: "destructive"
+        });
+        return { error };
+      }
+
+      toast({
+        title: "Password updated",
+        description: "Your password has been successfully changed.",
+        className: "bg-accent text-accent-foreground"
+      });
+
+      return { error: null };
+    } catch (error) {
+      const authError = error as AuthError;
+      toast({
+        title: "Password update failed",
+        description: authError.message,
+        variant: "destructive"
+      });
+      return { error: authError };
+    }
+  };
+
+  const createUser = async (username: string, password: string, userData: { name: string; role: 'admin' | 'staff' }) => {
+    try {
+      // This will create a user via API call to our admin endpoint
+      const response = await fetch('/api/admin/create-user', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          username,
+          password,
+          userData
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to create user');
+      }
+
+      toast({
+        title: "User created",
+        description: `User ${userData.name} has been successfully created.`,
+        className: "bg-accent text-accent-foreground"
+      });
+
+      return { error: null };
+    } catch (error) {
+      const authError = error as AuthError;
+      toast({
+        title: "User creation failed",
+        description: authError.message,
+        variant: "destructive"
+      });
+      return { error: authError };
+    }
+  };
+
   const value = {
     user,
     session,
     loading,
-    signUp,
     signIn,
     signOut,
     updateProfile,
+    updatePassword,
+    createUser,
   };
 
   return (
