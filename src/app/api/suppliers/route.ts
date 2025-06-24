@@ -1,23 +1,30 @@
-
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
-import { db } from '@/lib/firebase-admin';
+import { supabase } from '@/lib/supabase';
 import type { Supplier } from '@/lib/types';
-
-// Collection reference
-const suppliersCollection = db.collection('suppliers');
 
 export async function GET(request: NextRequest) {
   try {
-    const snapshot = await suppliersCollection.orderBy('name').get();
-    if (snapshot.empty) {
-      return NextResponse.json([]);
+    const { data: suppliers, error } = await supabase
+      .from('suppliers')
+      .select('*')
+      .order('name');
+
+    if (error) {
+      console.error('Error fetching suppliers:', error);
+      return NextResponse.json({ message: error.message }, { status: 500 });
     }
-    const suppliers: Supplier[] = snapshot.docs.map(doc => ({
-      id: doc.id,
-      ...doc.data()
-    } as Supplier));
-    return NextResponse.json(suppliers);
+
+    // Convert to app types
+    const formattedSuppliers: Supplier[] = suppliers.map(supplier => ({
+      id: supplier.id,
+      name: supplier.name,
+      contactPerson: supplier.contact_person,
+      phone: supplier.phone,
+      email: supplier.email,
+    }));
+
+    return NextResponse.json(formattedSuppliers);
   } catch (error) {
     console.error('Error fetching suppliers:', error);
     return NextResponse.json({ message: 'Failed to fetch suppliers' }, { status: 500 });
@@ -28,23 +35,40 @@ export async function POST(request: NextRequest) {
   try {
     const body = await request.json() as Omit<Supplier, 'id'>;
     
-    // Basic validation (could be more robust with Zod, etc.)
+    // Basic validation
     if (!body.name) {
       return NextResponse.json({ message: 'Supplier name is required' }, { status: 400 });
     }
 
-    const docRef = await suppliersCollection.add(body);
+    const { data: supplier, error } = await supabase
+      .from('suppliers')
+      .insert({
+        name: body.name,
+        contact_person: body.contactPerson || null,
+        phone: body.phone || null,
+        email: body.email || null,
+      })
+      .select()
+      .single();
+
+    if (error) {
+      console.error('Error creating supplier:', error);
+      return NextResponse.json({ message: error.message }, { status: 500 });
+    }
+
+    // Convert to app type
     const newSupplier: Supplier = {
-      id: docRef.id,
-      ...body
+      id: supplier.id,
+      name: supplier.name,
+      contactPerson: supplier.contact_person,
+      phone: supplier.phone,
+      email: supplier.email,
     };
+
     return NextResponse.json(newSupplier, { status: 201 });
   } catch (error: any) {
     console.error('Error creating supplier:', error);
-    let errorMessage = 'Failed to create supplier';
-    if (error.message) {
-        errorMessage = error.message;
-    }
+    const errorMessage = error.message || 'Failed to create supplier';
     return NextResponse.json({ message: errorMessage }, { status: 500 });
   }
 }

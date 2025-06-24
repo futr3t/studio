@@ -1,24 +1,37 @@
-
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
-import { db } from '@/lib/firebase-admin';
+import { supabase } from '@/lib/supabase';
 import type { Supplier } from '@/lib/types';
-
-const suppliersCollection = db.collection('suppliers');
 
 export async function GET(
   request: NextRequest,
   { params }: { params: { id: string } }
 ) {
   try {
-    const docRef = suppliersCollection.doc(params.id);
-    const docSnap = await docRef.get();
+    const { data: supplier, error } = await supabase
+      .from('suppliers')
+      .select('*')
+      .eq('id', params.id)
+      .single();
 
-    if (!docSnap.exists) {
-      return NextResponse.json({ message: 'Supplier not found' }, { status: 404 });
+    if (error) {
+      if (error.code === 'PGRST116') {
+        return NextResponse.json({ message: 'Supplier not found' }, { status: 404 });
+      }
+      console.error(`Error fetching supplier ${params.id}:`, error);
+      return NextResponse.json({ message: error.message }, { status: 500 });
     }
-    const supplier: Supplier = { id: docSnap.id, ...docSnap.data() } as Supplier;
-    return NextResponse.json(supplier);
+
+    // Convert to app type
+    const formattedSupplier: Supplier = {
+      id: supplier.id,
+      name: supplier.name,
+      contactPerson: supplier.contact_person,
+      phone: supplier.phone,
+      email: supplier.email,
+    };
+
+    return NextResponse.json(formattedSupplier);
   } catch (error) {
     console.error(`Error fetching supplier ${params.id}:`, error);
     return NextResponse.json({ message: 'Failed to fetch supplier' }, { status: 500 });
@@ -30,29 +43,48 @@ export async function PUT(
   { params }: { params: { id: string } }
 ) {
   try {
-    const body = await request.json() as Partial<Omit<Supplier, 'id'>>;
-    const docRef = suppliersCollection.doc(params.id);
-    const docSnap = await docRef.get();
-
-    if (!docSnap.exists) {
-      return NextResponse.json({ message: 'Supplier not found' }, { status: 404 });
-    }
+    const body = await request.json() as Partial<Supplier>;
 
     // Basic validation
-    if (body.name === '') { // Example: disallow empty name on update
-        return NextResponse.json({ message: 'Supplier name cannot be empty' }, { status: 400 });
+    if (body.name === '') {
+      return NextResponse.json({ message: 'Supplier name cannot be empty' }, { status: 400 });
     }
-    
-    await docRef.update(body);
-    const updatedSupplierData = { id: params.id, ...docSnap.data(), ...body };
 
-    return NextResponse.json(updatedSupplierData as Supplier);
+    const updateData: any = {};
+    if (body.name !== undefined) updateData.name = body.name;
+    if (body.contactPerson !== undefined) updateData.contact_person = body.contactPerson;
+    if (body.phone !== undefined) updateData.phone = body.phone;
+    if (body.email !== undefined) updateData.email = body.email;
+    updateData.updated_at = new Date().toISOString();
+
+    const { data: supplier, error } = await supabase
+      .from('suppliers')
+      .update(updateData)
+      .eq('id', params.id)
+      .select()
+      .single();
+
+    if (error) {
+      if (error.code === 'PGRST116') {
+        return NextResponse.json({ message: 'Supplier not found' }, { status: 404 });
+      }
+      console.error(`Error updating supplier ${params.id}:`, error);
+      return NextResponse.json({ message: error.message }, { status: 500 });
+    }
+
+    // Convert to app type
+    const updatedSupplier: Supplier = {
+      id: supplier.id,
+      name: supplier.name,
+      contactPerson: supplier.contact_person,
+      phone: supplier.phone,
+      email: supplier.email,
+    };
+
+    return NextResponse.json(updatedSupplier);
   } catch (error: any) {
     console.error(`Error updating supplier ${params.id}:`, error);
-    let errorMessage = 'Failed to update supplier';
-    if (error.message) {
-        errorMessage = error.message;
-    }
+    const errorMessage = error.message || 'Failed to update supplier';
     return NextResponse.json({ message: errorMessage }, { status: 500 });
   }
 }
@@ -62,15 +94,20 @@ export async function DELETE(
   { params }: { params: { id: string } }
 ) {
   try {
-    const docRef = suppliersCollection.doc(params.id);
-    const docSnap = await docRef.get();
+    const { error } = await supabase
+      .from('suppliers')
+      .delete()
+      .eq('id', params.id);
 
-    if (!docSnap.exists) {
-      return NextResponse.json({ message: 'Supplier not found' }, { status: 404 });
+    if (error) {
+      console.error(`Error deleting supplier ${params.id}:`, error);
+      return NextResponse.json({ message: error.message }, { status: 500 });
     }
 
-    await docRef.delete();
-    return NextResponse.json({ message: 'Supplier deleted successfully', deletedSupplierId: params.id });
+    return NextResponse.json({ 
+      message: 'Supplier deleted successfully', 
+      deletedSupplierId: params.id 
+    });
   } catch (error) {
     console.error(`Error deleting supplier ${params.id}:`, error);
     return NextResponse.json({ message: 'Failed to delete supplier' }, { status: 500 });

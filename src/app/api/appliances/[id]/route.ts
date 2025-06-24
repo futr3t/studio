@@ -1,35 +1,42 @@
-
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
-import { mockAppliancesData } from '@/lib/data'; // Used for re-initializing store if needed, not directly modified
+import { supabase } from '@/lib/supabase';
 import type { Appliance } from '@/lib/types';
-
-// This store should be the same instance as in the collection route.
-// For simplicity in Next.js dev mode where modules can be re-evaluated,
-// we re-use the mutable array from data.ts (if we directly modified it)
-// or manage a singleton. For now, let's assume a shared mutable store logic.
-// A better approach for shared in-memory store would be a singleton pattern.
-// For now, this might lead to inconsistencies if the base `mockAppliancesData` is re-imported.
-// Let's ensure our main route.ts manages the store, and this one refers to that, or it operates on a copy.
-// To simplify, we'll use the same "global" store as the POST route, by re-filtering from initial mock.
-// This is a limitation of simple in-memory stores across different route files without a proper singleton.
-
-// Hacky way to get a somewhat shared store for demo purposes.
-// In a real app, this would be a DB.
-let tempAppliancesStore: Appliance[] = [...mockAppliancesData.map(a => ({...a}))];
-// This function is a placeholder for a proper way to share the store instance.
-// Ideally, the store from the collection route (POST/GET all) should be used.
-// We will manually update this internal store based on operations.
 
 export async function GET(
   request: NextRequest,
   { params }: { params: { id: string } }
 ) {
-  const appliance = tempAppliancesStore.find(a => a.id === params.id);
-  if (appliance) {
-    return NextResponse.json(appliance);
+  try {
+    const { data: appliance, error } = await supabase
+      .from('appliances')
+      .select('*')
+      .eq('id', params.id)
+      .single();
+
+    if (error) {
+      if (error.code === 'PGRST116') {
+        return NextResponse.json({ message: 'Appliance not found' }, { status: 404 });
+      }
+      console.error(`Error fetching appliance ${params.id}:`, error);
+      return NextResponse.json({ message: error.message }, { status: 500 });
+    }
+
+    // Convert to app type
+    const formattedAppliance: Appliance = {
+      id: appliance.id,
+      name: appliance.name,
+      location: appliance.location,
+      type: appliance.type,
+      minTemp: appliance.min_temp,
+      maxTemp: appliance.max_temp,
+    };
+
+    return NextResponse.json(formattedAppliance);
+  } catch (error) {
+    console.error(`Error fetching appliance ${params.id}:`, error);
+    return NextResponse.json({ message: 'Failed to fetch appliance' }, { status: 500 });
   }
-  return NextResponse.json({ message: 'Appliance not found' }, { status: 404 });
 }
 
 export async function PUT(
@@ -37,30 +44,51 @@ export async function PUT(
   { params }: { params: { id: string } }
 ) {
   try {
-    const body = await request.json() as Partial<Omit<Appliance, 'id'>>;
-    const applianceIndex = tempAppliancesStore.findIndex(a => a.id === params.id);
+    const body = await request.json() as Partial<Appliance>;
 
-    if (applianceIndex === -1) {
-      return NextResponse.json({ message: 'Appliance not found' }, { status: 404 });
+    // Basic validation
+    if (body.name === '' || body.location === '' || body.type === '') {
+      return NextResponse.json({ message: 'Name, location, and type cannot be empty' }, { status: 400 });
     }
 
-    const updatedAppliance = { ...tempAppliancesStore[applianceIndex], ...body };
-    tempAppliancesStore[applianceIndex] = updatedAppliance;
+    const updateData: any = {};
+    if (body.name !== undefined) updateData.name = body.name;
+    if (body.location !== undefined) updateData.location = body.location;
+    if (body.type !== undefined) updateData.type = body.type;
+    if (body.minTemp !== undefined) updateData.min_temp = body.minTemp;
+    if (body.maxTemp !== undefined) updateData.max_temp = body.maxTemp;
+    updateData.updated_at = new Date().toISOString();
 
-    // Reflect change in original mock for other routes, VERY HACKY
-     const originalMockIndex = mockAppliancesData.findIndex(s => s.id === params.id);
-     if (originalMockIndex !== -1) {
-        mockAppliancesData[originalMockIndex] = {...updatedAppliance};
-     }
+    const { data: appliance, error } = await supabase
+      .from('appliances')
+      .update(updateData)
+      .eq('id', params.id)
+      .select()
+      .single();
 
+    if (error) {
+      if (error.code === 'PGRST116') {
+        return NextResponse.json({ message: 'Appliance not found' }, { status: 404 });
+      }
+      console.error(`Error updating appliance ${params.id}:`, error);
+      return NextResponse.json({ message: error.message }, { status: 500 });
+    }
+
+    // Convert to app type
+    const updatedAppliance: Appliance = {
+      id: appliance.id,
+      name: appliance.name,
+      location: appliance.location,
+      type: appliance.type,
+      minTemp: appliance.min_temp,
+      maxTemp: appliance.max_temp,
+    };
 
     return NextResponse.json(updatedAppliance);
-  } catch (error) {
-    let errorMessage = 'Failed to update appliance';
-    if (error instanceof Error) {
-      errorMessage = error.message;
-    }
-    return NextResponse.json({ message: errorMessage }, { status: 400 });
+  } catch (error: any) {
+    console.error(`Error updating appliance ${params.id}:`, error);
+    const errorMessage = error.message || 'Failed to update appliance';
+    return NextResponse.json({ message: errorMessage }, { status: 500 });
   }
 }
 
@@ -68,28 +96,23 @@ export async function DELETE(
   request: NextRequest,
   { params }: { params: { id: string } }
 ) {
-  const applianceIndex = tempAppliancesStore.findIndex(a => a.id === params.id);
+  try {
+    const { error } = await supabase
+      .from('appliances')
+      .delete()
+      .eq('id', params.id);
 
-  if (applianceIndex === -1) {
-    return NextResponse.json({ message: 'Appliance not found' }, { status: 404 });
+    if (error) {
+      console.error(`Error deleting appliance ${params.id}:`, error);
+      return NextResponse.json({ message: error.message }, { status: 500 });
+    }
+
+    return NextResponse.json({ 
+      message: 'Appliance deleted successfully', 
+      deletedApplianceId: params.id 
+    });
+  } catch (error) {
+    console.error(`Error deleting appliance ${params.id}:`, error);
+    return NextResponse.json({ message: 'Failed to delete appliance' }, { status: 500 });
   }
-
-  const deletedAppliance = tempAppliancesStore.splice(applianceIndex, 1)[0];
-  
-  // Reflect change in original mock for other routes, VERY HACKY
-  const originalMockIndex = mockAppliancesData.findIndex(s => s.id === params.id);
-  if (originalMockIndex !== -1) {
-      mockAppliancesData.splice(originalMockIndex, 1);
-  }
-
-  return NextResponse.json({ message: 'Appliance deleted successfully', deletedApplianceId: deletedAppliance.id });
-}
-
-// This function is used by the main route to update this local store.
-export function syncStoreWithGlobal(globalStore: Appliance[]) {
-    tempAppliancesStore = [...globalStore];
-}
-
-export function resetApplianceStore() {
-    tempAppliancesStore = [...mockAppliancesData.map(s => ({...s}))];
 }

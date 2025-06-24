@@ -18,7 +18,8 @@ import { useData } from '@/context/DataContext';
 import type { ProductionLog, DeliveryLog, TemperatureLog, CleaningChecklistItem, Supplier, Appliance, User } from '@/lib/types';
 import jsPDF from 'jspdf';
 import 'jspdf-autotable';
-import { STATIC_NOW } from '@/lib/data'; 
+// Remove dependency on mock data - use current date instead
+const STATIC_NOW = new Date(); 
 
 interface ReportData {
   reportTitle: string;

@@ -1,20 +1,63 @@
-
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
-import { mockUsersData } from '@/lib/data';
-import type { User } from '@/lib/types';
+import { supabase } from '@/lib/supabase';
+import type { User, TrainingRecord } from '@/lib/types';
 
-let tempUsersStore: User[] = [...mockUsersData.map(user => ({...user}))];
+// Helper function to convert training records from database format
+function convertTrainingRecordsFromDb(dbRecords: any[] | null): TrainingRecord[] {
+  if (!dbRecords) return [];
+  return dbRecords.map(record => ({
+    name: record.name,
+    dateCompleted: record.date_completed,
+    expiryDate: record.expiry_date,
+    certificateUrl: record.certificate_url,
+  }));
+}
+
+// Helper function to convert training records to database format
+function convertTrainingRecordsToDb(records: TrainingRecord[] | undefined): any[] | null {
+  if (!records) return null;
+  return records.map(record => ({
+    name: record.name,
+    date_completed: record.dateCompleted,
+    expiry_date: record.expiryDate,
+    certificate_url: record.certificateUrl,
+  }));
+}
 
 export async function GET(
   request: NextRequest,
   { params }: { params: { id: string } }
 ) {
-  const user = tempUsersStore.find(u => u.id === params.id);
-  if (user) {
-    return NextResponse.json(user);
+  try {
+    const { data: user, error } = await supabase
+      .from('users')
+      .select('*')
+      .eq('id', params.id)
+      .single();
+
+    if (error) {
+      if (error.code === 'PGRST116') {
+        return NextResponse.json({ message: 'User not found' }, { status: 404 });
+      }
+      console.error(`Error fetching user ${params.id}:`, error);
+      return NextResponse.json({ message: error.message }, { status: 500 });
+    }
+
+    // Convert to app type
+    const formattedUser: User = {
+      id: user.id,
+      name: user.name,
+      email: user.email,
+      role: user.role,
+      trainingRecords: convertTrainingRecordsFromDb(user.training_records),
+    };
+
+    return NextResponse.json(formattedUser);
+  } catch (error) {
+    console.error(`Error fetching user ${params.id}:`, error);
+    return NextResponse.json({ message: 'Failed to fetch user' }, { status: 500 });
   }
-  return NextResponse.json({ message: 'User not found' }, { status: 404 });
 }
 
 export async function PUT(
@@ -22,28 +65,49 @@ export async function PUT(
   { params }: { params: { id: string } }
 ) {
   try {
-    const body = await request.json() as Partial<Omit<User, 'id'>>;
-    const userIndex = tempUsersStore.findIndex(u => u.id === params.id);
+    const body = await request.json() as Partial<User>;
 
-    if (userIndex === -1) {
-      return NextResponse.json({ message: 'User not found' }, { status: 404 });
+    // Basic validation
+    if (!body.name || !body.email || !body.role) {
+      return NextResponse.json({ message: 'Name, email, and role cannot be empty' }, { status: 400 });
     }
 
-    const updatedUser = { ...tempUsersStore[userIndex], ...body };
-    tempUsersStore[userIndex] = updatedUser;
+    const updateData: any = {};
+    if (body.name !== undefined) updateData.name = body.name;
+    if (body.email !== undefined) updateData.email = body.email;
+    if (body.role !== undefined) updateData.role = body.role;
+    if (body.trainingRecords !== undefined) updateData.training_records = convertTrainingRecordsToDb(body.trainingRecords);
+    updateData.updated_at = new Date().toISOString();
 
-    const originalMockIndex = mockUsersData.findIndex(u => u.id === params.id);
-    if (originalMockIndex !== -1) {
-        mockUsersData[originalMockIndex] = {...updatedUser};
+    const { data: user, error } = await supabase
+      .from('users')
+      .update(updateData)
+      .eq('id', params.id)
+      .select()
+      .single();
+
+    if (error) {
+      if (error.code === 'PGRST116') {
+        return NextResponse.json({ message: 'User not found' }, { status: 404 });
+      }
+      console.error(`Error updating user ${params.id}:`, error);
+      return NextResponse.json({ message: error.message }, { status: 500 });
     }
+
+    // Convert to app type
+    const updatedUser: User = {
+      id: user.id,
+      name: user.name,
+      email: user.email,
+      role: user.role,
+      trainingRecords: convertTrainingRecordsFromDb(user.training_records),
+    };
 
     return NextResponse.json(updatedUser);
-  } catch (error) {
-    let errorMessage = 'Failed to update user';
-    if (error instanceof Error) {
-      errorMessage = error.message;
-    }
-    return NextResponse.json({ message: errorMessage }, { status: 400 });
+  } catch (error: any) {
+    console.error(`Error updating user ${params.id}:`, error);
+    const errorMessage = error.message || 'Failed to update user';
+    return NextResponse.json({ message: errorMessage }, { status: 500 });
   }
 }
 
@@ -51,18 +115,23 @@ export async function DELETE(
   request: NextRequest,
   { params }: { params: { id: string } }
 ) {
-  const userIndex = tempUsersStore.findIndex(u => u.id === params.id);
+  try {
+    const { error } = await supabase
+      .from('users')
+      .delete()
+      .eq('id', params.id);
 
-  if (userIndex === -1) {
-    return NextResponse.json({ message: 'User not found' }, { status: 404 });
+    if (error) {
+      console.error(`Error deleting user ${params.id}:`, error);
+      return NextResponse.json({ message: error.message }, { status: 500 });
+    }
+
+    return NextResponse.json({ 
+      message: 'User deleted successfully', 
+      deletedUserId: params.id 
+    });
+  } catch (error) {
+    console.error(`Error deleting user ${params.id}:`, error);
+    return NextResponse.json({ message: 'Failed to delete user' }, { status: 500 });
   }
-
-  const deletedUser = tempUsersStore.splice(userIndex, 1)[0];
-
-  const originalMockIndex = mockUsersData.findIndex(u => u.id === params.id);
-  if (originalMockIndex !== -1) {
-      mockUsersData.splice(originalMockIndex, 1);
-  }
-
-  return NextResponse.json({ message: 'User deleted successfully', deletedUserId: deletedUser.id });
 }

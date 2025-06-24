@@ -1,11 +1,7 @@
-
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
-import { mockTemperatureLogsData, mockAppliancesData, STATIC_NOW } from '@/lib/data'; // Assuming STATIC_NOW for initial parameters
+import { supabase } from '@/lib/supabase';
 import type { TemperatureLog, Appliance, SystemParameters } from '@/lib/types';
-import { formatISO } from 'date-fns';
-
-let temperatureLogsStore: TemperatureLog[] = [...mockTemperatureLogsData.map(log => ({...log}))];
 // For compliance check, we need system parameters. For now, hardcode or fetch from a simplified source.
 // This should ideally come from a system parameters API or be passed if context is available.
 const currentSystemParameters: SystemParameters = {
@@ -16,7 +12,6 @@ const currentSystemParameters: SystemParameters = {
   },
   notifications: { emailAlerts: true, smsAlerts: false } // Default
 };
-
 
 const getApplianceEffectiveTempRange = (appliance: Appliance): { min: number; max: number } | null => {
     if (typeof appliance.minTemp === 'number' && typeof appliance.maxTemp === 'number') {
@@ -29,41 +24,107 @@ const getApplianceEffectiveTempRange = (appliance: Appliance): { min: number; ma
     return null;
 };
 
-
 export async function GET(request: NextRequest) {
-  return NextResponse.json(temperatureLogsStore);
+  try {
+    const { data: temperatureLogs, error } = await supabase
+      .from('temperature_logs')
+      .select('*')
+      .order('log_time', { ascending: false });
+
+    if (error) {
+      console.error('Error fetching temperature logs:', error);
+      return NextResponse.json({ message: error.message }, { status: 500 });
+    }
+
+    // Convert to app types
+    const formattedLogs: TemperatureLog[] = temperatureLogs.map(log => ({
+      id: log.id,
+      applianceId: log.appliance_id,
+      temperature: log.temperature,
+      logTime: log.log_time,
+      isCompliant: log.is_compliant,
+      correctiveAction: log.corrective_action,
+      loggedBy: log.logged_by,
+    }));
+
+    return NextResponse.json(formattedLogs);
+  } catch (error) {
+    console.error('Error fetching temperature logs:', error);
+    return NextResponse.json({ message: 'Failed to fetch temperature logs' }, { status: 500 });
+  }
 }
 
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json() as Omit<TemperatureLog, 'id' | 'logTime' | 'isCompliant'> & { applianceId: string };
     
-    const appliance = mockAppliancesData.find(a => a.id === body.applianceId); // Use mock for this check
-    if (!appliance) {
-        return NextResponse.json({ message: 'Appliance not found for compliance check' }, { status: 400 });
+    // Basic validation
+    if (!body.applianceId || typeof body.temperature !== 'number') {
+      return NextResponse.json({ message: 'Appliance ID and temperature are required' }, { status: 400 });
     }
 
+    // Fetch appliance for compliance check
+    const { data: appliance, error: applianceError } = await supabase
+      .from('appliances')
+      .select('*')
+      .eq('id', body.applianceId)
+      .single();
+
+    if (applianceError || !appliance) {
+      return NextResponse.json({ message: 'Appliance not found for compliance check' }, { status: 400 });
+    }
+
+    // Convert appliance to app type for compliance check
+    const applianceForCheck: Appliance = {
+      id: appliance.id,
+      name: appliance.name,
+      location: appliance.location,
+      type: appliance.type,
+      minTemp: appliance.min_temp,
+      maxTemp: appliance.max_temp,
+    };
+
     let isCompliant = true;
-    const effectiveRange = getApplianceEffectiveTempRange(appliance);
+    const effectiveRange = getApplianceEffectiveTempRange(applianceForCheck);
     if (effectiveRange) {
       if (body.temperature < effectiveRange.min || body.temperature > effectiveRange.max) {
         isCompliant = false;
       }
     }
 
-    const newLog: TemperatureLog = {
-      ...body,
-      id: `temp${Date.now()}${Math.random().toString(16).slice(2)}`,
-      logTime: formatISO(new Date()),
-      isCompliant,
-    };
-    temperatureLogsStore.unshift(newLog);
-    return NextResponse.json(newLog, { status: 201 });
-  } catch (error) {
-    let errorMessage = 'Failed to create temperature log';
-    if (error instanceof Error) {
-      errorMessage = error.message;
+    const { data: temperatureLog, error } = await supabase
+      .from('temperature_logs')
+      .insert({
+        appliance_id: body.applianceId,
+        temperature: body.temperature,
+        log_time: new Date().toISOString(),
+        is_compliant: isCompliant,
+        corrective_action: body.correctiveAction || null,
+        logged_by: body.loggedBy || null,
+      })
+      .select()
+      .single();
+
+    if (error) {
+      console.error('Error creating temperature log:', error);
+      return NextResponse.json({ message: error.message }, { status: 500 });
     }
-    return NextResponse.json({ message: errorMessage }, { status: 400 });
+
+    // Convert to app type
+    const newLog: TemperatureLog = {
+      id: temperatureLog.id,
+      applianceId: temperatureLog.appliance_id,
+      temperature: temperatureLog.temperature,
+      logTime: temperatureLog.log_time,
+      isCompliant: temperatureLog.is_compliant,
+      correctiveAction: temperatureLog.corrective_action,
+      loggedBy: temperatureLog.logged_by,
+    };
+
+    return NextResponse.json(newLog, { status: 201 });
+  } catch (error: any) {
+    console.error('Error creating temperature log:', error);
+    const errorMessage = error.message || 'Failed to create temperature log';
+    return NextResponse.json({ message: errorMessage }, { status: 500 });
   }
 }
