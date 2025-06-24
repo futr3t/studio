@@ -95,43 +95,55 @@ export default function DashboardPage() {
     <div className="flex flex-col min-h-screen">
       <MainNav />
       <main className="flex-1 p-4 md:p-8 space-y-6">
-        <h1 className="text-3xl font-bold font-headline tracking-tight">Dashboard</h1>
+        <div className="flex items-center space-x-3 mb-2">
+          <div className="p-3 bg-primary/10 rounded-xl">
+            <LayoutDashboard className="h-6 w-6 text-primary" />
+          </div>
+          <h1 className="text-3xl font-bold font-headline tracking-tight text-foreground">Dashboard</h1>
+        </div>
         
         <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Overall Compliance</CardTitle>
-              <CheckCircle2 className="h-5 w-5 text-green-500" />
+          <Card className="card-enhanced metric-card">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
+              <CardTitle className="text-sm font-medium text-muted-foreground">Overall Compliance</CardTitle>
+              <div className="p-2 bg-emerald-100 rounded-full">
+                <CheckCircle2 className="h-4 w-4 text-emerald-600" />
+              </div>
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{complianceData.rate}%</div>
+              <div className="text-3xl font-bold text-foreground">{complianceData.rate}%</div>
+              <p className="text-xs text-muted-foreground mt-1">System-wide compliance rate</p>
             </CardContent>
           </Card>
 
-          <Link href="/cleaning" className="block hover:shadow-lg transition-shadow rounded-lg">
-            <Card className="h-full hover:cursor-pointer">
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Pending Cleaning Tasks</CardTitle>
-                <ListChecks className="h-5 w-5 text-blue-500" />
+          <Link href="/cleaning" className="block rounded-xl">
+            <Card className="h-full card-enhanced card-interactive metric-card">
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
+                <CardTitle className="text-sm font-medium text-muted-foreground">Pending Cleaning Tasks</CardTitle>
+                <div className="p-2 bg-blue-100 rounded-full">
+                  <ListChecks className="h-4 w-4 text-blue-600" />
+                </div>
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold">{pendingCleaningTasks}</div>
-                <p className="text-xs text-muted-foreground">
+                <div className="text-3xl font-bold text-foreground">{pendingCleaningTasks}</div>
+                <p className="text-xs text-muted-foreground mt-1">
                   Due based on schedule
                 </p>
               </CardContent>
             </Card>
           </Link>
 
-          <Link href="/reports" className="block hover:shadow-lg transition-shadow rounded-lg">
-            <Card className="h-full hover:cursor-pointer">
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Active Alerts</CardTitle>
-                <AlertTriangle className="h-5 w-5 text-red-500" />
+          <Link href="/reports" className="block rounded-xl">
+            <Card className="h-full card-enhanced card-interactive metric-card">
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
+                <CardTitle className="text-sm font-medium text-muted-foreground">Active Alerts</CardTitle>
+                <div className="p-2 bg-red-100 rounded-full">
+                  <AlertTriangle className="h-4 w-4 text-red-600" />
+                </div>
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold">{activeAlertsCount}</div>
-                <p className="text-xs text-muted-foreground">
+                <div className="text-3xl font-bold text-foreground">{activeAlertsCount}</div>
+                <p className="text-xs text-muted-foreground mt-1">
                   Non-compliant logs
                 </p>
               </CardContent>
@@ -140,9 +152,9 @@ export default function DashboardPage() {
         </div>
 
         <div className="grid gap-6 xl:grid-cols-2">
-          <Card>
-            <CardHeader>
-              <CardTitle>Compliance Trend</CardTitle>
+          <Card className="card-enhanced">
+            <CardHeader className="pb-4">
+              <CardTitle className="text-xl font-semibold">Compliance Trend</CardTitle>
               <CardDescription>Monthly compliance vs. non-compliance logs</CardDescription>
             </CardHeader>
             <CardContent>
@@ -168,9 +180,9 @@ export default function DashboardPage() {
               </ChartContainer>
             </CardContent>
           </Card>
-          <Card>
-            <CardHeader>
-              <CardTitle>Recent Activity</CardTitle>
+          <Card className="card-enhanced">
+            <CardHeader className="pb-4">
+              <CardTitle className="text-xl font-semibold">Recent Activity</CardTitle>
               <CardDescription>Latest logs and system events</CardDescription>
             </CardHeader>
             <CardContent className="space-y-3 max-h-[300px] overflow-y-auto">
@@ -181,21 +193,35 @@ export default function DashboardPage() {
                 const ItemIcon = activity.itemIcon; 
                 const StatusIcon = activity.statusIcon; 
                 return (
-                  <div key={activity.id} className={cn("flex items-center space-x-3 p-3 rounded-md", activity.isNonCompliant ? "bg-destructive/10" : "bg-card-foreground/5")}>
-                    <ItemIcon className={cn("h-5 w-5", 
-                      activity.logType === 'temperature' ? "text-blue-500" :
-                      activity.logType === 'production' ? "text-orange-500" : 
-                      activity.logType === 'cleaning' ? "text-purple-500" :
-                      activity.logType === 'delivery' ? "text-indigo-500" : "text-gray-500"
-                    )} />
-                    <div className="flex-1">
-                      <p className="text-sm font-medium">{activity.description}</p>
+                  <div key={activity.id} className={cn(
+                    "flex items-center space-x-3 p-3 rounded-lg border transition-all duration-200",
+                    activity.isNonCompliant 
+                      ? "bg-red-50/50 border-red-100 hover:bg-red-50" 
+                      : "bg-white/50 border-gray-100 hover:bg-white/80"
+                  )}>
+                    <div className={cn("p-2 rounded-full", 
+                      activity.logType === 'temperature' ? "bg-blue-100" :
+                      activity.logType === 'production' ? "bg-orange-100" : 
+                      activity.logType === 'cleaning' ? "bg-purple-100" :
+                      activity.logType === 'delivery' ? "bg-indigo-100" : "bg-gray-100"
+                    )}>
+                      <ItemIcon className={cn("h-4 w-4", 
+                        activity.logType === 'temperature' ? "text-blue-600" :
+                        activity.logType === 'production' ? "text-orange-600" : 
+                        activity.logType === 'cleaning' ? "text-purple-600" :
+                        activity.logType === 'delivery' ? "text-indigo-600" : "text-gray-600"
+                      )} />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium text-foreground truncate">{activity.description}</p>
                       <p className="text-xs text-muted-foreground">
                         {format(parseISO(activity.timestamp), "PPpp", { locale: enUS })}
                         {activity.user && ` by ${activity.user}`}
                       </p>
                     </div>
-                    <StatusIcon className={cn("h-5 w-5 ml-auto", activity.isNonCompliant ? "text-red-500" : "text-green-500")} />
+                    <div className={cn("p-1.5 rounded-full", activity.isNonCompliant ? "bg-red-100" : "bg-emerald-100")}>
+                      <StatusIcon className={cn("h-3 w-3", activity.isNonCompliant ? "text-red-600" : "text-emerald-600")} />
+                    </div>
                   </div>
                 );
               })}
