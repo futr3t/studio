@@ -1,4 +1,3 @@
-
 "use client";
 import React, { createContext, useContext, useState, ReactNode, useCallback, useEffect } from 'react';
 import { formatISO } from 'date-fns';
@@ -133,8 +132,28 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         body: body ? JSON.stringify(body) : undefined,
       });
       if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || `Failed to ${method.toLowerCase()} ${entityName || 'item'}`);
+        let errorMessage = `Failed to ${method.toLowerCase()} ${entityName || 'item'}`;
+        let errorData: any = null;
+        const contentType = response.headers.get('Content-Type');
+        const contentLength = response.headers.get('Content-Length');
+        // Only try to parse JSON if content-type is JSON and there is content
+        if (contentType && contentType.includes('application/json')) {
+          try {
+            errorData = await response.json();
+            errorMessage = errorData.message || errorData.error || errorMessage;
+          } catch (jsonErr) {
+            // JSON parsing failed, keep fallback error message
+          }
+        } else if (contentLength && parseInt(contentLength) > 0) {
+          // Try to get text if not JSON but has content
+          try {
+            const text = await response.text();
+            errorMessage = text || errorMessage;
+          } catch (textErr) {
+            // fallback
+          }
+        }
+        throw new Error(errorMessage);
       }
       const result = method !== 'DELETE' ? await response.json() : null;
       if (successMessage && entityName) {
