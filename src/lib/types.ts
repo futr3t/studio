@@ -136,11 +136,9 @@ export interface DataContextType {
   cleaningTasks: CleaningTask[]; // Definitions
   cleaningChecklistItems: CleaningChecklistItem[]; // Instances
   users: User[];
-  currentUser: User | null;
   systemParameters: SystemParameters;
   getRecentActivities: (limit?: number) => ActivityFeedItem[];
 
-  setCurrentUser: (user: User | null) => void;
   updateSystemParameters: (newParams: SystemParameters) => void;
 
   addSupplier: (supplierData: Omit<Supplier, 'id'>) => void;

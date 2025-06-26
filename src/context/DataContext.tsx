@@ -5,9 +5,9 @@ import type {
   Supplier, Appliance, ProductionLog, DeliveryLog, TemperatureLog,
   CleaningTask, CleaningChecklistItem, User, ActivityFeedItem, SystemParameters, TemperatureRange, DataContextType
 } from '@/lib/types';
-// Mock data imports are removed as data will be fetched from API
 import { CheckCircle2, AlertTriangle, ClipboardList, Thermometer, Sparkles, Truck, Factory } from 'lucide-react';
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from '@/context/AuthContext';
 
 const initialSystemParameters: SystemParameters = { // Default fallback
   temperatureRanges: {
@@ -21,6 +21,7 @@ const initialSystemParameters: SystemParameters = { // Default fallback
 const DataContext = createContext<DataContextType | undefined>(undefined);
 
 export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
+  const { user: authUser } = useAuth();
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [appliances, setAppliances] = useState<Appliance[]>([]);
   const [productionLogs, setProductionLogs] = useState<ProductionLog[]>([]);
@@ -30,7 +31,6 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const [cleaningChecklistItems, setCleaningChecklistItems] = useState<CleaningChecklistItem[]>([]);
   const [users, setUsers] = useState<User[]>([]);
   const [systemParameters, setSystemParameters] = useState<SystemParameters>(initialSystemParameters);
-  const [currentUser, setCurrentUserInternal] = useState<User | null>(null);
   const { toast } = useToast();
 
   const fetchData = useCallback(async <T,>(endpoint: string, setter: React.Dispatch<React.SetStateAction<T[]>>, entityName: string) => {
@@ -66,23 +66,15 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     fetchData<TemperatureLog>('temperature-logs', setTemperatureLogs, 'temperature logs');
     fetchData<CleaningTask>('cleaning-tasks', setCleaningTasks, 'cleaning task definitions');
     fetchData<CleaningChecklistItem>('cleaning-checklist-items', setCleaningChecklistItems, 'cleaning checklist items');
-    fetchData<User>('users', setUsers, 'users').then(() => {
-        // Set initial user after users are fetched
-        // This is a simplified way; a real app would have auth determining the user.
-        fetch('/api/users')
-          .then(res => res.json())
-          .then((allUsers: User[]) => {
-            const adminUser = allUsers.find(u => u.role === 'admin') || allUsers[0] || null;
-            setCurrentUserInternal(adminUser);
-          }).catch(() => setCurrentUserInternal(null));
-    });
+    
+    if (authUser && authUser.user_metadata?.role === 'admin') {
+      fetchData<User>('users', setUsers, 'users');
+    } else {
+      setUsers([]);
+    }
+
     fetchSingleData<SystemParameters>('system-parameters', setSystemParameters, 'system parameters', initialSystemParameters);
-  }, [fetchData, fetchSingleData]);
-
-
-  const setCurrentUser = (user: User | null) => {
-    setCurrentUserInternal(user);
-  };
+  }, [fetchData, fetchSingleData, authUser]);
 
   const updateSystemParameters = async (newParams: SystemParameters) => {
      try {
@@ -290,7 +282,6 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const value: DataContextType = {
     suppliers, appliances, productionLogs, deliveryLogs, temperatureLogs,
     cleaningTasks, cleaningChecklistItems, users, systemParameters,
-    currentUser, setCurrentUser,
     getRecentActivities, updateSystemParameters,
     addSupplier, updateSupplier, deleteSupplier,
     addAppliance, updateAppliance, deleteAppliance,
