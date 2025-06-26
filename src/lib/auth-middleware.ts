@@ -2,7 +2,7 @@ import { createServerClient } from '@supabase/ssr';
 import { cookies } from 'next/headers';
 import { NextRequest, NextResponse } from 'next/server';
 
-export async function withAuth(
+export function withAuth(
   handler: (request: NextRequest, context: { user: any }) => Promise<NextResponse>
 ) {
   return async function (request: NextRequest, params?: any) {
@@ -40,7 +40,7 @@ export async function withAuth(
   };
 }
 
-export async function withAdminAuth(
+export function withAdminAuth(
   handler: (request: NextRequest, context: { user: any }) => Promise<NextResponse>
 ) {
   return async function (request: NextRequest, params?: any) {
