@@ -103,6 +103,6 @@ async function createApplianceHandler(request: NextRequest, context: { user: any
 }
 
 // GET: All authenticated users can read appliances
-// POST: Only admins can create appliances
+// POST: All authenticated users can create appliances
 export const GET = withAuth(getAppliancesHandler);
-export const POST = withAdminAuth(createApplianceHandler);
+export const POST = withAuth(createApplianceHandler);

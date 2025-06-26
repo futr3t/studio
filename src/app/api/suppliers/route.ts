@@ -1,10 +1,23 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
-import { supabase } from '@/lib/supabase';
 import type { Supplier } from '@/lib/types';
+import { withAuth } from '@/lib/auth-middleware';
 
-export async function GET(request: NextRequest) {
+async function getSuppliersHandler(request: NextRequest, context: { user: any }) {
   try {
+    // Create authenticated Supabase client
+    const { createClient } = await import('@supabase/supabase-js');
+    const supabase = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!,
+      {
+        auth: {
+          autoRefreshToken: false,
+          persistSession: false
+        }
+      }
+    );
+
     const { data: suppliers, error } = await supabase
       .from('suppliers')
       .select('*')
@@ -31,7 +44,7 @@ export async function GET(request: NextRequest) {
   }
 }
 
-export async function POST(request: NextRequest) {
+async function createSupplierHandler(request: NextRequest, context: { user: any }) {
   try {
     const body = await request.json() as Omit<Supplier, 'id'>;
     
@@ -39,6 +52,19 @@ export async function POST(request: NextRequest) {
     if (!body.name) {
       return NextResponse.json({ message: 'Supplier name is required' }, { status: 400 });
     }
+
+    // Create authenticated Supabase client
+    const { createClient } = await import('@supabase/supabase-js');
+    const supabase = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!,
+      {
+        auth: {
+          autoRefreshToken: false,
+          persistSession: false
+        }
+      }
+    );
 
     const { data: supplier, error } = await supabase
       .from('suppliers')
@@ -72,3 +98,8 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ message: errorMessage }, { status: 500 });
   }
 }
+
+// GET: All authenticated users can read suppliers
+// POST: All authenticated users can create suppliers
+export const GET = withAuth(getSuppliersHandler);
+export const POST = withAuth(createSupplierHandler);

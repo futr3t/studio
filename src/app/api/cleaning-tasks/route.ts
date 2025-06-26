@@ -1,10 +1,23 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
-import { supabase } from '@/lib/supabase';
 import type { CleaningTask } from '@/lib/types';
+import { withAuth } from '@/lib/auth-middleware';
 
-export async function GET(request: NextRequest) {
+async function getCleaningTasksHandler(request: NextRequest, context: { user: any }) {
   try {
+    // Create authenticated Supabase client
+    const { createClient } = await import('@supabase/supabase-js');
+    const supabase = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!,
+      {
+        auth: {
+          autoRefreshToken: false,
+          persistSession: false
+        }
+      }
+    );
+
     const { data: cleaningTasks, error } = await supabase
       .from('cleaning_tasks')
       .select('*')
@@ -32,7 +45,7 @@ export async function GET(request: NextRequest) {
   }
 }
 
-export async function POST(request: NextRequest) {
+async function createCleaningTaskHandler(request: NextRequest, context: { user: any }) {
   try {
     const body = await request.json() as Omit<CleaningTask, 'id'>;
     
@@ -40,6 +53,19 @@ export async function POST(request: NextRequest) {
     if (!body.name || !body.area || !body.frequency) {
       return NextResponse.json({ message: 'Name, area, and frequency are required' }, { status: 400 });
     }
+
+    // Create authenticated Supabase client
+    const { createClient } = await import('@supabase/supabase-js');
+    const supabase = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!,
+      {
+        auth: {
+          autoRefreshToken: false,
+          persistSession: false
+        }
+      }
+    );
 
     const { data: cleaningTask, error } = await supabase
       .from('cleaning_tasks')
@@ -75,3 +101,8 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ message: errorMessage }, { status: 500 });
   }
 }
+
+// GET: All authenticated users can read cleaning tasks
+// POST: All authenticated users can create cleaning tasks
+export const GET = withAuth(getCleaningTasksHandler);
+export const POST = withAuth(createCleaningTaskHandler);

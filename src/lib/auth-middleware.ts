@@ -7,7 +7,7 @@ export async function withAuth(
 ) {
   return async function (request: NextRequest, params?: any) {
     try {
-      const cookieStore = cookies();
+      const cookieStore = await cookies();
       const supabase = createServerClient(
         process.env.NEXT_PUBLIC_SUPABASE_URL!,
         process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
@@ -52,7 +52,7 @@ export async function withAdminAuth(
         url: process.env.NEXT_PUBLIC_SUPABASE_URL?.substring(0, 30) + '...'
       });
       
-      const cookieStore = cookies();
+      const cookieStore = await cookies();
       const supabase = createServerClient(
         process.env.NEXT_PUBLIC_SUPABASE_URL!,
         process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,

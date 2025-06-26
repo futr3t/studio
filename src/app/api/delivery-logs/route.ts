@@ -1,10 +1,23 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
-import { supabase } from '@/lib/supabase';
 import type { DeliveryLog, DeliveryItem } from '@/lib/types';
+import { withAuth } from '@/lib/auth-middleware';
 
-export async function GET(request: NextRequest) {
+async function getDeliveryLogsHandler(request: NextRequest, context: { user: any }) {
   try {
+    // Create authenticated Supabase client
+    const { createClient } = await import('@supabase/supabase-js');
+    const supabase = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!,
+      {
+        auth: {
+          autoRefreshToken: false,
+          persistSession: false
+        }
+      }
+    );
+
     const { data: deliveryLogs, error } = await supabase
       .from('delivery_logs')
       .select(`
@@ -46,7 +59,7 @@ export async function GET(request: NextRequest) {
   }
 }
 
-export async function POST(request: NextRequest) {
+async function createDeliveryLogHandler(request: NextRequest, context: { user: any }) {
   try {
     const body = await request.json() as Omit<DeliveryLog, 'id' | 'deliveryTime'>;
     
@@ -54,6 +67,19 @@ export async function POST(request: NextRequest) {
     if (!body.supplierId || !body.items || body.items.length === 0) {
       return NextResponse.json({ message: 'Supplier ID and items are required' }, { status: 400 });
     }
+
+    // Create authenticated Supabase client
+    const { createClient } = await import('@supabase/supabase-js');
+    const supabase = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!,
+      {
+        auth: {
+          autoRefreshToken: false,
+          persistSession: false
+        }
+      }
+    );
 
     // Create delivery log first
     const { data: deliveryLog, error: logError } = await supabase
@@ -127,3 +153,8 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ message: errorMessage }, { status: 500 });
   }
 }
+
+// GET: All authenticated users can read delivery logs
+// POST: All authenticated users can create delivery logs
+export const GET = withAuth(getDeliveryLogsHandler);
+export const POST = withAuth(createDeliveryLogHandler);

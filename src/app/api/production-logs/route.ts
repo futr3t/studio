@@ -1,10 +1,23 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
-import { supabase } from '@/lib/supabase';
 import type { ProductionLog } from '@/lib/types';
+import { withAuth } from '@/lib/auth-middleware';
 
-export async function GET(request: NextRequest) {
+async function getProductionLogsHandler(request: NextRequest, context: { user: any }) {
   try {
+    // Create authenticated Supabase client
+    const { createClient } = await import('@supabase/supabase-js');
+    const supabase = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!,
+      {
+        auth: {
+          autoRefreshToken: false,
+          persistSession: false
+        }
+      }
+    );
+
     const { data: productionLogs, error } = await supabase
       .from('production_logs')
       .select('*')
@@ -34,7 +47,7 @@ export async function GET(request: NextRequest) {
   }
 }
 
-export async function POST(request: NextRequest) {
+async function createProductionLogHandler(request: NextRequest, context: { user: any }) {
   try {
     const body = await request.json() as Omit<ProductionLog, 'id' | 'logTime'>;
     
@@ -42,6 +55,19 @@ export async function POST(request: NextRequest) {
     if (!body.productName || !body.batchCode || !body.criticalLimitDetails) {
       return NextResponse.json({ message: 'Product name, batch code, and critical limit details are required' }, { status: 400 });
     }
+
+    // Create authenticated Supabase client
+    const { createClient } = await import('@supabase/supabase-js');
+    const supabase = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!,
+      {
+        auth: {
+          autoRefreshToken: false,
+          persistSession: false
+        }
+      }
+    );
 
     const { data: productionLog, error } = await supabase
       .from('production_logs')
@@ -81,3 +107,8 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ message: errorMessage }, { status: 500 });
   }
 }
+
+// GET: All authenticated users can read production logs
+// POST: All authenticated users can create production logs
+export const GET = withAuth(getProductionLogsHandler);
+export const POST = withAuth(createProductionLogHandler);
