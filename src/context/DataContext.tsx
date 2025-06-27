@@ -31,11 +31,17 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const [cleaningChecklistItems, setCleaningChecklistItems] = useState<CleaningChecklistItem[]>([]);
   const [users, setUsers] = useState<User[]>([]);
   const [systemParameters, setSystemParameters] = useState<SystemParameters>(initialSystemParameters);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const { toast } = useToast();
 
   const fetchData = useCallback(async () => {
+    // Only fetch data if user is authenticated
+    if (!authUser) {
+      setLoading(false);
+      return;
+    }
+    
     setLoading(true);
     setError(null);
     try {
