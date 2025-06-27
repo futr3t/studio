@@ -47,8 +47,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     try {
       const endpoints = [
         'suppliers', 'appliances', 'production-logs', 'delivery-logs',
-        'temperature-logs', 'cleaning-tasks', 'cleaning-checklist-items',
-        'system-parameters'
+        'temperature-logs', 'cleaning-tasks', 'cleaning-checklist-items'
       ];
       if (authUser && authUser.user_metadata?.role === 'admin') {
         endpoints.push('users');
@@ -73,11 +72,23 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       setTemperatureLogs(data[4]);
       setCleaningTasks(data[5]);
       setCleaningChecklistItems(data[6]);
-      setSystemParameters(data[7]);
       if (authUser && authUser.user_metadata?.role === 'admin') {
-        setUsers(data[8]);
+        setUsers(data[7]);
       } else {
         setUsers([]);
+      }
+
+      // Fetch system parameters separately with error handling
+      try {
+        const systemParamsResponse = await fetch('/api/system-parameters', { headers });
+        if (systemParamsResponse.ok) {
+          const systemParamsData = await systemParamsResponse.json();
+          setSystemParameters(systemParamsData);
+        } else {
+          console.warn('System parameters not available, using defaults');
+        }
+      } catch (error) {
+        console.warn('Failed to fetch system parameters, using defaults:', error);
       }
     } catch (error: any) {
       setError(error.message);
