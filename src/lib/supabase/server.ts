@@ -15,6 +15,12 @@ export function createSupabaseServerClient() {
         get(name: string) {
           return getCookie(cookieStore, name);
         },
+        set(name: string, value: string, options: any) {
+          cookieStore.set({ name, value, ...options });
+        },
+        remove(name: string, options: any) {
+          cookieStore.set({ name, value: '', ...options });
+        },
       },
     }
   );
@@ -33,6 +39,12 @@ export function createSupabaseAdminServerClient() {
         cookies: {
             get(name: string) {
               return getCookie(cookieStore, name);
+            },
+            set(name: string, value: string, options: any) {
+              cookieStore.set({ name, value, ...options });
+            },
+            remove(name: string, options: any) {
+              cookieStore.set({ name, value: '', ...options });
             },
           },
       }
