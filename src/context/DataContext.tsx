@@ -21,7 +21,7 @@ const initialSystemParameters: SystemParameters = { // Default fallback
 const DataContext = createContext<DataContextType | undefined>(undefined);
 
 export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-  const { user: authUser } = useAuth();
+  const { user: authUser, session } = useAuth();
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [appliances, setAppliances] = useState<Appliance[]>([]);
   const [productionLogs, setProductionLogs] = useState<ProductionLog[]>([]);
@@ -53,7 +53,12 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       if (authUser && authUser.user_metadata?.role === 'admin') {
         endpoints.push('users');
       }
-      const responses = await Promise.all(endpoints.map(e => fetch(`/api/${e}`)));
+      const headers: HeadersInit = {};
+      if (session?.access_token) {
+        headers['Authorization'] = `Bearer ${session.access_token}`;
+      }
+      
+      const responses = await Promise.all(endpoints.map(e => fetch(`/api/${e}`, { headers })));
       const data = await Promise.all(responses.map(res => {
         if (!res.ok) {
           throw new Error(`Failed to fetch ${res.url}`);
@@ -80,7 +85,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     } finally {
       setLoading(false);
     }
-  }, [authUser, toast]);
+  }, [authUser, session, toast]);
 
   useEffect(() => {
     // Only fetch data when user is authenticated (not null or undefined)
@@ -91,9 +96,14 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   const updateSystemParameters = async (newParams: SystemParameters) => {
      try {
+      const headers: HeadersInit = { 'Content-Type': 'application/json' };
+      if (session?.access_token) {
+        headers['Authorization'] = `Bearer ${session.access_token}`;
+      }
+      
       const response = await fetch('/api/system-parameters', {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+        headers,
         body: JSON.stringify(newParams),
       });
       if (!response.ok) throw new Error('Failed to update system parameters');
@@ -131,9 +141,14 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     id?: string,
   ): Promise<T | null> => {
     try {
+      const headers: HeadersInit = { 'Content-Type': 'application/json' };
+      if (session?.access_token) {
+        headers['Authorization'] = `Bearer ${session.access_token}`;
+      }
+      
       const response = await fetch(id ? `/api/${endpoint}/${id}` : `/api/${endpoint}`, {
         method,
-        headers: { 'Content-Type': 'application/json' },
+        headers,
         body: body ? JSON.stringify(body) : undefined,
       });
       if (!response.ok) {

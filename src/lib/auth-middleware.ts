@@ -6,17 +6,42 @@ export function withAuth(
 ) {
   return async function (request: NextRequest, params?: any) {
     try {
-      const supabase = createSupabaseServerClient();
-      const { data: { session }, error } = await supabase.auth.getSession();
+      // Get the Authorization header
+      const authHeader = request.headers.get('authorization');
+      const accessToken = authHeader?.replace('Bearer ', '');
+      
+      console.log('Auth middleware - Header check:', { 
+        hasAuthHeader: !!authHeader,
+        hasAccessToken: !!accessToken 
+      });
 
-      if (error || !session?.user) {
+      if (!accessToken) {
+        console.log('Auth middleware - No access token found');
         return NextResponse.json(
           { error: 'Unauthorized' }, 
           { status: 401 }
         );
       }
 
-      return await handler(request, { user: session.user }, params);
+      // Verify the token with Supabase
+      const supabase = createSupabaseServerClient();
+      const { data: { user }, error } = await supabase.auth.getUser(accessToken);
+
+      console.log('Auth middleware - Token verification:', { 
+        hasUser: !!user, 
+        error: error?.message 
+      });
+
+      if (error || !user) {
+        console.log('Auth middleware - Invalid token');
+        return NextResponse.json(
+          { error: 'Unauthorized' }, 
+          { status: 401 }
+        );
+      }
+
+      console.log('Auth middleware - Access granted for user:', user.id);
+      return await handler(request, { user }, params);
     } catch (error) {
       console.error('Auth middleware error:', error);
       return NextResponse.json(
