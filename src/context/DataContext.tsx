@@ -42,6 +42,13 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       return;
     }
     
+    // Additional safety check for session
+    if (!session) {
+      console.warn('No session available, skipping data fetch');
+      setLoading(false);
+      return;
+    }
+    
     setLoading(true);
     setError(null);
     try {
@@ -65,15 +72,22 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         return res.json();
       }
       ));
-      setSuppliers(data[0]);
-      setAppliances(data[1]);
-      setProductionLogs(data[2]);
-      setDeliveryLogs(data[3]);
-      setTemperatureLogs(data[4]);
-      setCleaningTasks(data[5]);
-      setCleaningChecklistItems(data[6]);
+      
+      // Create a mapping of endpoint to data to avoid index issues
+      const dataMap = endpoints.reduce((acc, endpoint, index) => {
+        acc[endpoint] = data[index];
+        return acc;
+      }, {} as Record<string, any>);
+      
+      setSuppliers(dataMap['suppliers'] || []);
+      setAppliances(dataMap['appliances'] || []);
+      setProductionLogs(dataMap['production-logs'] || []);
+      setDeliveryLogs(dataMap['delivery-logs'] || []);
+      setTemperatureLogs(dataMap['temperature-logs'] || []);
+      setCleaningTasks(dataMap['cleaning-tasks'] || []);
+      setCleaningChecklistItems(dataMap['cleaning-checklist-items'] || []);
       if (authUser && authUser.user_metadata?.role === 'admin') {
-        setUsers(data[7]);
+        setUsers(dataMap['users'] || []);
       } else {
         setUsers([]);
       }

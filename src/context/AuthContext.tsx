@@ -2,8 +2,18 @@ import React, { createContext, useContext, useEffect, useState, ReactNode } from
 import { createClient, type Session, type User, AuthError } from '@supabase/supabase-js';
 import { useToast } from '@/hooks/use-toast';
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
+// Safely access environment variables with fallbacks
+const supabaseUrl = typeof window !== 'undefined' 
+  ? process.env.NEXT_PUBLIC_SUPABASE_URL || ''
+  : process.env.NEXT_PUBLIC_SUPABASE_URL || '';
+const supabaseAnonKey = typeof window !== 'undefined'
+  ? process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
+  : process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
+
+if (!supabaseUrl || !supabaseAnonKey) {
+  console.error('Missing Supabase environment variables');
+}
+
 const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
 interface AuthContextType {

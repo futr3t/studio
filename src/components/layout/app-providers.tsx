@@ -4,13 +4,16 @@
 import React from 'react';
 import { DataProvider } from '@/context/DataContext';
 import { AuthProvider } from '@/context/AuthContext';
+import { ErrorBoundary } from '@/components/error-boundary';
 
 export default function AppProviders({ children }: { children: React.ReactNode }) {
   return (
-    <AuthProvider>
-      <DataProvider>
-        {children}
-      </DataProvider>
-    </AuthProvider>
+    <ErrorBoundary>
+      <AuthProvider>
+        <DataProvider>
+          {children}
+        </DataProvider>
+      </AuthProvider>
+    </ErrorBoundary>
   );
 }

@@ -68,11 +68,17 @@ function DashboardContent() {
     const monthlyData: { month: string, compliant: number, nonCompliant: number }[] = months.map(m => ({ month: m, compliant: 0, nonCompliant: 0 }));
 
     allLogs.forEach(log => {
-      const monthIndex = parseISO(log.time).getMonth(); // Use the common 'time' field
-      if (log.isCompliant) {
-        monthlyData[monthIndex].compliant++;
-      } else {
-        monthlyData[monthIndex].nonCompliant++;
+      try {
+        const monthIndex = parseISO(log.time).getMonth(); // Use the common 'time' field
+        if (monthIndex >= 0 && monthIndex < 12) {
+          if (log.isCompliant) {
+            monthlyData[monthIndex].compliant++;
+          } else {
+            monthlyData[monthIndex].nonCompliant++;
+          }
+        }
+      } catch (error) {
+        console.warn('Invalid date format in log:', log.time, error);
       }
     });
     
@@ -231,7 +237,14 @@ function DashboardContent() {
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-medium text-foreground truncate">{activity.description}</p>
                       <p className="text-xs text-muted-foreground">
-                        {format(parseISO(activity.timestamp), "PPpp", { locale: enUS })}
+                        {(() => {
+                          try {
+                            return format(parseISO(activity.timestamp), "PPpp", { locale: enUS });
+                          } catch (error) {
+                            console.warn('Invalid timestamp format:', activity.timestamp, error);
+                            return 'Invalid date';
+                          }
+                        })()}
                         {activity.user && ` by ${activity.user}`}
                       </p>
                     </div>
