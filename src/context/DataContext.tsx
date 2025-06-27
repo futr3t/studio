@@ -36,8 +36,11 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const { toast } = useToast();
 
   const fetchData = useCallback(async () => {
+    console.log('fetchData called:', { hasAuthUser: !!authUser, hasSession: !!session });
+    
     // Only fetch data if user is authenticated
     if (!authUser) {
+      console.log('No authUser, skipping data fetch');
       setLoading(false);
       return;
     }
@@ -49,6 +52,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       return;
     }
     
+    console.log('Starting data fetch for user:', authUser.id);
     setLoading(true);
     setError(null);
     try {
@@ -86,8 +90,10 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       setTemperatureLogs(dataMap['temperature-logs'] || []);
       setCleaningTasks(dataMap['cleaning-tasks'] || []);
       setCleaningChecklistItems(dataMap['cleaning-checklist-items'] || []);
-      if (authUser && authUser.user_metadata?.role === 'admin') {
-        setUsers(dataMap['users'] || []);
+      
+      // Handle users data - only set if we fetched it
+      if (authUser && authUser.user_metadata?.role === 'admin' && dataMap['users']) {
+        setUsers(dataMap['users']);
       } else {
         setUsers([]);
       }

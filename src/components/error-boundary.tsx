@@ -41,9 +41,16 @@ export class ErrorBoundary extends React.Component<
               <p className="text-sm text-muted-foreground">
                 A client-side error has occurred. This might be due to a temporary issue.
               </p>
-              {process.env.NODE_ENV === 'development' && this.state.error && (
+              {this.state.error && (
                 <div className="text-xs text-left bg-gray-100 p-3 rounded font-mono">
+                  <div className="font-semibold mb-1">Error:</div>
                   {this.state.error.message}
+                  {process.env.NODE_ENV === 'development' && (
+                    <div className="mt-2">
+                      <div className="font-semibold">Stack:</div>
+                      <pre className="whitespace-pre-wrap text-xs">{this.state.error.stack}</pre>
+                    </div>
+                  )}
                 </div>
               )}
               <button
