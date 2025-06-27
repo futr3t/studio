@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { withAdminAuth } from '@/lib/auth-middleware';
+import { createSupabaseAdminServerClient } from '@/lib/supabase/server';
 
 async function handler(request: NextRequest, context: { user: any }) {
   try {
@@ -20,18 +21,7 @@ async function handler(request: NextRequest, context: { user: any }) {
     // Convert username to email format for Supabase
     const email = `${username}@chefcheck.local`;
 
-    // Create Supabase admin client for user creation (direct connection, no cookies needed)
-    const { createClient } = await import('@supabase/supabase-js');
-    const supabase = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!,
-      {
-        auth: {
-          autoRefreshToken: false,
-          persistSession: false
-        }
-      }
-    );
+    const supabase = createSupabaseAdminServerClient();
 
     // Create the user using admin API
     const { data, error } = await supabase.auth.admin.createUser({

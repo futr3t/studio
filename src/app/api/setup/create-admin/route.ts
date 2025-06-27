@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { createSupabaseAdminServerClient } from '@/lib/supabase/server';
 
 // This is a one-time setup endpoint to create the initial admin user
 // Should be disabled in production after initial setup
@@ -25,18 +26,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Create Supabase admin client (direct connection, no cookies needed)
-    const { createClient } = await import('@supabase/supabase-js');
-    const supabase = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!,
-      {
-        auth: {
-          autoRefreshToken: false,
-          persistSession: false
-        }
-      }
-    );
+    const supabase = createSupabaseAdminServerClient();
 
     // Convert username to email format
     const email = `${username}@chefcheck.local`;

@@ -1,9 +1,10 @@
-"use client";
-
-import React, { createContext, useContext, useEffect, useState } from 'react';
-import { User, Session, AuthError } from '@supabase/supabase-js';
-import { supabase } from '@/lib/supabase';
+import React, { createContext, useContext, useEffect, useState, ReactNode } from 'react';
+import { createClient, type Session, type User, AuthError } from '@supabase/supabase-js';
 import { useToast } from '@/hooks/use-toast';
+
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
+const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
 interface AuthContextType {
   user: User | null;
@@ -18,14 +19,13 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-export function AuthProvider({ children }: { children: React.ReactNode }) {
+export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
 
   useEffect(() => {
-    // Get initial session
     const getInitialSession = async () => {
       const { data: { session } } = await supabase.auth.getSession();
       setSession(session);
@@ -35,9 +35,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     getInitialSession();
 
-    // Listen for auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (event, session) => {
+      async (event: string, session: Session | null) => {
         setSession(session);
         setUser(session?.user ?? null);
         setLoading(false);
@@ -65,8 +64,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const signIn = async (username: string, password: string) => {
     try {
-      // Convert username to email format for Supabase
-      // We'll use username@chefcheck.local as the email format
       const email = `${username}@chefcheck.local`;
       
       const { error } = await supabase.auth.signInWithPassword({
@@ -174,7 +171,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const createUser = async (username: string, password: string, userData: { name: string; role: 'admin' | 'staff' }) => {
     try {
-      // This will create a user via API call to our admin endpoint
       const response = await fetch('/api/admin/create-user', {
         method: 'POST',
         headers: {

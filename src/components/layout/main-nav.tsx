@@ -15,6 +15,7 @@ import {
   LogOut,
   User,
   ChevronDown,
+  Lock,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -114,7 +115,12 @@ export function MainNav() {
                 </Link>
               </DropdownMenuItem>
               <DropdownMenuItem asChild>
-                <PasswordChangeForm />
+                <PasswordChangeForm>
+                  <Button variant="ghost" className="w-full justify-start px-2 py-1.5 h-auto">
+                    <Lock className="mr-2 h-4 w-4" />
+                    Change Password
+                  </Button>
+                </PasswordChangeForm>
               </DropdownMenuItem>
               <DropdownMenuSeparator />
               <DropdownMenuItem 

@@ -1,38 +1,51 @@
 
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
-import type { SystemParameters } from '@/lib/types';
 import { withAuth, withAdminAuth } from '@/lib/auth-middleware';
-
-// Initial system parameters (could be from a config file or DB in a real app)
-let currentSystemParameters: SystemParameters = {
-  temperatureRanges: {
-    fridge: { min: 0, max: 5 },
-    freezer: { min: -25, max: -18 },
-    hotHold: { min: 63, max: 75 },
-  },
-  notifications: {
-    emailAlerts: true,
-    smsAlerts: false,
-  },
-};
+import { createSupabaseAdminServerClient, createSupabaseServerClient } from '@/lib/supabase/server';
 
 async function getSystemParametersHandler(request: NextRequest, context: { user: any }) {
-  return NextResponse.json(currentSystemParameters);
+  try {
+    const supabase = createSupabaseServerClient();
+    const { data, error } = await supabase
+      .from('system_parameters')
+      .select('*')
+      .single();
+
+    if (error) {
+      console.error('Error fetching system parameters:', error);
+      return NextResponse.json({ message: error.message }, { status: 500 });
+    }
+
+    return NextResponse.json(data);
+  } catch (error) {
+    console.error('Error fetching system parameters:', error);
+    return NextResponse.json({ message: 'Failed to fetch system parameters' }, { status: 500 });
+  }
 }
 
 async function updateSystemParametersHandler(request: NextRequest, context: { user: any }) {
   try {
-    const body = await request.json() as SystemParameters;
-    // Basic validation could be added here
-    currentSystemParameters = body;
-    return NextResponse.json(currentSystemParameters);
-  } catch (error) {
-    let errorMessage = 'Failed to update system parameters';
-    if (error instanceof Error) {
-      errorMessage = error.message;
+    const body = await request.json();
+    const supabase = createSupabaseAdminServerClient();
+
+    const { data, error } = await supabase
+      .from('system_parameters')
+      .update(body)
+      .eq('id', body.id) // Assuming there's a single row with a known ID, or upsert
+      .select()
+      .single();
+
+    if (error) {
+      console.error('Error updating system parameters:', error);
+      return NextResponse.json({ message: error.message }, { status: 500 });
     }
-    return NextResponse.json({ message: errorMessage }, { status: 400 });
+
+    return NextResponse.json(data);
+  } catch (error: any) {
+    console.error('Error updating system parameters:', error);
+    const errorMessage = error.message || 'Failed to update system parameters';
+    return NextResponse.json({ message: errorMessage }, { status: 500 });
   }
 }
 

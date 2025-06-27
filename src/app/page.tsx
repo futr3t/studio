@@ -41,12 +41,19 @@ export default function DashboardPage() {
     temperatureLogs, 
     deliveryLogs, 
     cleaningChecklistItems, 
-    getRecentActivities 
+    getRecentActivities,
+    loading,
+    error
   } = useData();
 
-  const recentActivities = useMemo(() => getRecentActivities(5), [getRecentActivities]);
+  const recentActivities = useMemo(() => {
+    if (loading || error) return [];
+    return getRecentActivities(5);
+  }, [getRecentActivities, loading, error]);
 
   const complianceData = useMemo(() => {
+    if (loading || error) return { rate: 100, chartData: [] };
+    
     const allLogs = [
       ...productionLogs.map(l => ({ ...l, type: 'Production', time: l.logTime })),
       ...temperatureLogs.map(l => ({ ...l, type: 'Temperature', time: l.logTime })),
@@ -72,24 +79,33 @@ export default function DashboardPage() {
     const currentMonth = new Date().getMonth();
     const displayMonths = monthlyData.slice(Math.max(0, currentMonth - 5), currentMonth + 1);
 
-
     return {
       rate: complianceRate,
       chartData: displayMonths.length > 1 ? displayMonths : monthlyData.slice(0,6) 
     };
-  }, [productionLogs, temperatureLogs, deliveryLogs]);
+  }, [productionLogs, temperatureLogs, deliveryLogs, loading, error]);
 
   const pendingCleaningTasks = useMemo(() => {
+    if (loading || error) return 0;
     return cleaningChecklistItems.filter(item => !item.completed).length;
-  }, [cleaningChecklistItems]);
+  }, [cleaningChecklistItems, loading, error]);
 
   const activeAlertsCount = useMemo(() => {
+    if (loading || error) return 0;
     return [
       ...productionLogs.filter(l => !l.isCompliant),
       ...temperatureLogs.filter(l => !l.isCompliant),
       ...deliveryLogs.filter(l => !l.isCompliant)
     ].length;
-  }, [productionLogs, temperatureLogs, deliveryLogs]);
+  }, [productionLogs, temperatureLogs, deliveryLogs, loading, error]);
+
+  if (loading) {
+    return <div>Loading...</div>;
+  }
+
+  if (error) {
+    return <div>Error: {error}</div>;
+  }
 
 
   return (

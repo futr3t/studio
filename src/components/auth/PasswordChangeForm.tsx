@@ -28,7 +28,7 @@ const passwordChangeSchema = z.object({
 
 type PasswordChangeForm = z.infer<typeof passwordChangeSchema>;
 
-export function PasswordChangeForm() {
+export function PasswordChangeForm({ children }: { children?: React.ReactNode }) {
   const [isLoading, setIsLoading] = useState(false);
   const [isOpen, setIsOpen] = useState(false);
   const [showNewPassword, setShowNewPassword] = useState(false);
@@ -57,10 +57,7 @@ export function PasswordChangeForm() {
   return (
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
       <DialogTrigger asChild>
-        <Button variant="ghost" className="w-full justify-start px-2 py-1.5 h-auto">
-          <Lock className="mr-2 h-4 w-4" />
-          Change Password
-        </Button>
+        {children}
       </DialogTrigger>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>

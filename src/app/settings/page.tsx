@@ -188,7 +188,6 @@ export default function SettingsPage() {
       if (!result.error) {
         // Also add to local data context for immediate UI update
         addUser({ 
-          id: `temp-${Date.now()}`, // Temporary ID
           name: data.name, 
           email: `${data.username}@chefcheck.local`, // Convert username to email format for display
           role: data.role,

@@ -1,22 +1,11 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
-import type { Appliance } from '@/lib/types';
 import { withAuth, withAdminAuth } from '@/lib/auth-middleware';
+import { createSupabaseAdminServerClient, createSupabaseServerClient } from '@/lib/supabase/server';
 
 async function getAppliancesHandler(request: NextRequest, context: { user: any }) {
   try {
-    // Create authenticated Supabase client
-    const { createClient } = await import('@supabase/supabase-js');
-    const supabase = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!,
-      {
-        auth: {
-          autoRefreshToken: false,
-          persistSession: false
-        }
-      }
-    );
+    const supabase = createSupabaseServerClient();
 
     const { data: appliances, error } = await supabase
       .from('appliances')
@@ -28,17 +17,7 @@ async function getAppliancesHandler(request: NextRequest, context: { user: any }
       return NextResponse.json({ message: error.message }, { status: 500 });
     }
 
-    // Convert to app types
-    const formattedAppliances: Appliance[] = appliances.map(appliance => ({
-      id: appliance.id,
-      name: appliance.name,
-      location: appliance.location,
-      type: appliance.type,
-      minTemp: appliance.min_temp,
-      maxTemp: appliance.max_temp,
-    }));
-
-    return NextResponse.json(formattedAppliances);
+    return NextResponse.json(appliances);
   } catch (error) {
     console.error('Error fetching appliances:', error);
     return NextResponse.json({ message: 'Failed to fetch appliances' }, { status: 500 });
@@ -47,35 +26,17 @@ async function getAppliancesHandler(request: NextRequest, context: { user: any }
 
 async function createApplianceHandler(request: NextRequest, context: { user: any }) {
   try {
-    const body = await request.json() as Omit<Appliance, 'id'>;
+    const body = await request.json();
     
-    // Basic validation
     if (!body.name || !body.location || !body.type) {
       return NextResponse.json({ message: 'Name, location, and type are required' }, { status: 400 });
     }
 
-    // Create authenticated Supabase client
-    const { createClient } = await import('@supabase/supabase-js');
-    const supabase = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!,
-      {
-        auth: {
-          autoRefreshToken: false,
-          persistSession: false
-        }
-      }
-    );
+    const supabase = createSupabaseAdminServerClient();
 
     const { data: appliance, error } = await supabase
       .from('appliances')
-      .insert({
-        name: body.name,
-        location: body.location,
-        type: body.type,
-        min_temp: body.minTemp || null,
-        max_temp: body.maxTemp || null,
-      })
+      .insert(body)
       .select()
       .single();
 
@@ -84,17 +45,7 @@ async function createApplianceHandler(request: NextRequest, context: { user: any
       return NextResponse.json({ message: error.message }, { status: 500 });
     }
 
-    // Convert to app type
-    const newAppliance: Appliance = {
-      id: appliance.id,
-      name: appliance.name,
-      location: appliance.location,
-      type: appliance.type,
-      minTemp: appliance.min_temp,
-      maxTemp: appliance.max_temp,
-    };
-
-    return NextResponse.json(newAppliance, { status: 201 });
+    return NextResponse.json(appliance, { status: 201 });
   } catch (error: any) {
     console.error('Error creating appliance:', error);
     const errorMessage = error.message || 'Failed to create appliance';
@@ -103,6 +54,6 @@ async function createApplianceHandler(request: NextRequest, context: { user: any
 }
 
 // GET: All authenticated users can read appliances
-// POST: All authenticated users can create appliances
+// POST: Only admins can create appliances
 export const GET = withAuth(getAppliancesHandler);
-export const POST = withAuth(createApplianceHandler);
+export const POST = withAdminAuth(createApplianceHandler);

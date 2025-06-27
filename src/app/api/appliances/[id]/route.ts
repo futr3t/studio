@@ -1,118 +1,85 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
-import { supabase } from '@/lib/supabase';
-import type { Appliance } from '@/lib/types';
+import { withAuth, withAdminAuth } from '@/lib/auth-middleware';
+import { createSupabaseAdminServerClient, createSupabaseServerClient } from '@/lib/supabase/server';
 
-export async function GET(
-  request: NextRequest,
-  { params }: { params: { id: string } }
-) {
+async function getApplianceByIdHandler(request: NextRequest, context: { user: any }, params: { id: string }) {
   try {
+    const { id } = params;
+
+    const supabase = createSupabaseServerClient();
+
     const { data: appliance, error } = await supabase
       .from('appliances')
       .select('*')
-      .eq('id', params.id)
+      .eq('id', id)
       .single();
 
     if (error) {
-      if (error.code === 'PGRST116') {
-        return NextResponse.json({ message: 'Appliance not found' }, { status: 404 });
-      }
-      console.error(`Error fetching appliance ${params.id}:`, error);
-      return NextResponse.json({ message: error.message }, { status: 500 });
+      console.error(`Error fetching appliance with ID ${id}:`, error);
+      return NextResponse.json({ message: `Appliance with ID ${id} not found` }, { status: 404 });
     }
 
-    // Convert to app type
-    const formattedAppliance: Appliance = {
-      id: appliance.id,
-      name: appliance.name,
-      location: appliance.location,
-      type: appliance.type,
-      minTemp: appliance.min_temp,
-      maxTemp: appliance.max_temp,
-    };
-
-    return NextResponse.json(formattedAppliance);
+    return NextResponse.json(appliance);
   } catch (error) {
-    console.error(`Error fetching appliance ${params.id}:`, error);
+    console.error(`Error fetching appliance with ID ${params.id}:`, error);
     return NextResponse.json({ message: 'Failed to fetch appliance' }, { status: 500 });
   }
 }
 
-export async function PUT(
-  request: NextRequest,
-  { params }: { params: { id: string } }
-) {
+async function updateApplianceHandler(request: NextRequest, context: { user: any }, params: { id: string }) {
   try {
-    const body = await request.json() as Partial<Appliance>;
+    const { id } = params;
+    const body = await request.json();
 
-    // Basic validation
-    if (body.name === '' || body.location === '' || body.type === '') {
-      return NextResponse.json({ message: 'Name, location, and type cannot be empty' }, { status: 400 });
-    }
-
-    const updateData: any = {};
-    if (body.name !== undefined) updateData.name = body.name;
-    if (body.location !== undefined) updateData.location = body.location;
-    if (body.type !== undefined) updateData.type = body.type;
-    if (body.minTemp !== undefined) updateData.min_temp = body.minTemp;
-    if (body.maxTemp !== undefined) updateData.max_temp = body.maxTemp;
-    updateData.updated_at = new Date().toISOString();
+    const supabase = createSupabaseAdminServerClient();
 
     const { data: appliance, error } = await supabase
       .from('appliances')
-      .update(updateData)
-      .eq('id', params.id)
+      .update(body)
+      .eq('id', id)
       .select()
       .single();
 
     if (error) {
-      if (error.code === 'PGRST116') {
-        return NextResponse.json({ message: 'Appliance not found' }, { status: 404 });
-      }
-      console.error(`Error updating appliance ${params.id}:`, error);
+      console.error(`Error updating appliance with ID ${id}:`, error);
       return NextResponse.json({ message: error.message }, { status: 500 });
     }
 
-    // Convert to app type
-    const updatedAppliance: Appliance = {
-      id: appliance.id,
-      name: appliance.name,
-      location: appliance.location,
-      type: appliance.type,
-      minTemp: appliance.min_temp,
-      maxTemp: appliance.max_temp,
-    };
-
-    return NextResponse.json(updatedAppliance);
+    return NextResponse.json(appliance);
   } catch (error: any) {
-    console.error(`Error updating appliance ${params.id}:`, error);
+    console.error(`Error updating appliance with ID ${params.id}:`, error);
     const errorMessage = error.message || 'Failed to update appliance';
     return NextResponse.json({ message: errorMessage }, { status: 500 });
   }
 }
 
-export async function DELETE(
-  request: NextRequest,
-  { params }: { params: { id: string } }
-) {
+async function deleteApplianceHandler(request: NextRequest, context: { user: any }, params: { id: string }) {
   try {
+    const { id } = params;
+
+    const supabase = createSupabaseAdminServerClient();
+
     const { error } = await supabase
       .from('appliances')
       .delete()
-      .eq('id', params.id);
+      .eq('id', id);
 
     if (error) {
-      console.error(`Error deleting appliance ${params.id}:`, error);
+      console.error(`Error deleting appliance with ID ${id}:`, error);
       return NextResponse.json({ message: error.message }, { status: 500 });
     }
 
-    return NextResponse.json({ 
-      message: 'Appliance deleted successfully', 
-      deletedApplianceId: params.id 
-    });
+    return new NextResponse(null, { status: 204 }); // No Content
   } catch (error) {
-    console.error(`Error deleting appliance ${params.id}:`, error);
+    console.error(`Error deleting appliance with ID ${params.id}:`, error);
     return NextResponse.json({ message: 'Failed to delete appliance' }, { status: 500 });
   }
 }
+
+// GET: All authenticated users can read a single appliance
+// PUT: Only admins can update an appliance
+// DELETE: Only admins can delete an appliance
+export const GET = withAuth(getApplianceByIdHandler);
+export const PUT = withAdminAuth(updateApplianceHandler);
+export const DELETE = withAdminAuth(deleteApplianceHandler);

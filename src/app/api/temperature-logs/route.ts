@@ -1,43 +1,23 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import type { TemperatureLog, Appliance, SystemParameters } from '@/lib/types';
-import { withAuth } from '@/lib/auth-middleware';
-// For compliance check, we need system parameters. For now, hardcode or fetch from a simplified source.
-// This should ideally come from a system parameters API or be passed if context is available.
-const currentSystemParameters: SystemParameters = {
-  temperatureRanges: {
-    fridge: { min: 0, max: 5 },
-    freezer: { min: -25, max: -18 },
-    hotHold: { min: 63, max: 75 },
-  },
-  notifications: { emailAlerts: true, smsAlerts: false } // Default
-};
+import { withAuth, withAdminAuth } from '@/lib/auth-middleware';
+import { createSupabaseAdminServerClient, createSupabaseServerClient } from '@/lib/supabase/server';
 
-const getApplianceEffectiveTempRange = (appliance: Appliance): { min: number; max: number } | null => {
+const getApplianceEffectiveTempRange = (appliance: Appliance, systemParameters: SystemParameters): { min: number; max: number } | null => {
     if (typeof appliance.minTemp === 'number' && typeof appliance.maxTemp === 'number') {
       return { min: appliance.minTemp, max: appliance.maxTemp };
     }
     const typeKey = appliance.type.toLowerCase().replace(/\s+/g, '');
-    if (typeKey.includes('fridge')) return currentSystemParameters.temperatureRanges.fridge;
-    if (typeKey.includes('freezer')) return currentSystemParameters.temperatureRanges.freezer;
-    if (typeKey.includes('hothold') || typeKey.includes('bainmarie') || typeKey.includes('oven')) return currentSystemParameters.temperatureRanges.hotHold;
+    if (typeKey.includes('fridge')) return systemParameters.temperatureRanges.fridge;
+    if (typeKey.includes('freezer')) return systemParameters.temperatureRanges.freezer;
+    if (typeKey.includes('hothold') || typeKey.includes('bainmarie') || typeKey.includes('oven')) return systemParameters.temperatureRanges.hotHold;
     return null;
 };
 
 async function getTemperatureLogsHandler(request: NextRequest, context: { user: any }) {
   try {
-    // Create authenticated Supabase client
-    const { createClient } = await import('@supabase/supabase-js');
-    const supabase = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!,
-      {
-        auth: {
-          autoRefreshToken: false,
-          persistSession: false
-        }
-      }
-    );
+    const supabase = createSupabaseServerClient();
 
     const { data: temperatureLogs, error } = await supabase
       .from('temperature_logs')
@@ -49,18 +29,7 @@ async function getTemperatureLogsHandler(request: NextRequest, context: { user: 
       return NextResponse.json({ message: error.message }, { status: 500 });
     }
 
-    // Convert to app types
-    const formattedLogs: TemperatureLog[] = temperatureLogs.map(log => ({
-      id: log.id,
-      applianceId: log.appliance_id,
-      temperature: log.temperature,
-      logTime: log.log_time,
-      isCompliant: log.is_compliant,
-      correctiveAction: log.corrective_action,
-      loggedBy: log.logged_by,
-    }));
-
-    return NextResponse.json(formattedLogs);
+    return NextResponse.json(temperatureLogs);
   } catch (error) {
     console.error('Error fetching temperature logs:', error);
     return NextResponse.json({ message: 'Failed to fetch temperature logs' }, { status: 500 });
@@ -69,27 +38,14 @@ async function getTemperatureLogsHandler(request: NextRequest, context: { user: 
 
 async function createTemperatureLogHandler(request: NextRequest, context: { user: any }) {
   try {
-    const body = await request.json() as Omit<TemperatureLog, 'id' | 'logTime' | 'isCompliant'> & { applianceId: string };
+    const body = await request.json();
     
-    // Basic validation
     if (!body.applianceId || typeof body.temperature !== 'number') {
       return NextResponse.json({ message: 'Appliance ID and temperature are required' }, { status: 400 });
     }
 
-    // Create authenticated Supabase client
-    const { createClient } = await import('@supabase/supabase-js');
-    const supabase = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!,
-      {
-        auth: {
-          autoRefreshToken: false,
-          persistSession: false
-        }
-      }
-    );
+    const supabase = createSupabaseAdminServerClient();
 
-    // Fetch appliance for compliance check
     const { data: appliance, error: applianceError } = await supabase
       .from('appliances')
       .select('*')
@@ -100,25 +56,23 @@ async function createTemperatureLogHandler(request: NextRequest, context: { user
       return NextResponse.json({ message: 'Appliance not found for compliance check' }, { status: 400 });
     }
 
-    // Convert appliance to app type for compliance check
-    const applianceForCheck: Appliance = {
-      id: appliance.id,
-      name: appliance.name,
-      location: appliance.location,
-      type: appliance.type,
-      minTemp: appliance.min_temp,
-      maxTemp: appliance.max_temp,
-    };
+    const { data: systemParameters, error: systemParametersError } = await supabase
+      .from('system_parameters')
+      .select('*')
+      .single();
+
+    if (systemParametersError || !systemParameters) {
+      return NextResponse.json({ message: 'System parameters not found for compliance check' }, { status: 400 });
+    }
 
     let isCompliant = true;
-    const effectiveRange = getApplianceEffectiveTempRange(applianceForCheck);
+    const effectiveRange = getApplianceEffectiveTempRange(appliance, systemParameters);
     if (effectiveRange) {
       if (body.temperature < effectiveRange.min || body.temperature > effectiveRange.max) {
         isCompliant = false;
       }
     }
 
-    // Use authenticated user's info
     const userName = context.user.user_metadata?.name || context.user.user_metadata?.username || 'Unknown User';
 
     const { data: temperatureLog, error } = await supabase
@@ -139,18 +93,7 @@ async function createTemperatureLogHandler(request: NextRequest, context: { user
       return NextResponse.json({ message: error.message }, { status: 500 });
     }
 
-    // Convert to app type
-    const newLog: TemperatureLog = {
-      id: temperatureLog.id,
-      applianceId: temperatureLog.appliance_id,
-      temperature: temperatureLog.temperature,
-      logTime: temperatureLog.log_time,
-      isCompliant: temperatureLog.is_compliant,
-      correctiveAction: temperatureLog.corrective_action,
-      loggedBy: temperatureLog.logged_by,
-    };
-
-    return NextResponse.json(newLog, { status: 201 });
+    return NextResponse.json(temperatureLog, { status: 201 });
   } catch (error: any) {
     console.error('Error creating temperature log:', error);
     const errorMessage = error.message || 'Failed to create temperature log';
@@ -160,4 +103,4 @@ async function createTemperatureLogHandler(request: NextRequest, context: { user
 
 // All authenticated users can read and create temperature logs
 export const GET = withAuth(getTemperatureLogsHandler);
-export const POST = withAuth(createTemperatureLogHandler);
+export const POST = withAdminAuth(createTemperatureLogHandler);

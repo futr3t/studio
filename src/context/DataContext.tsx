@@ -1,5 +1,5 @@
 "use client";
-import React, { createContext, useContext, useState, ReactNode, useCallback, useEffect } from 'react';
+import React, { createContext, useContext, useState, ReactNode, useCallback, useEffect, useMemo } from 'react';
 import { formatISO } from 'date-fns';
 import type {
   Supplier, Appliance, ProductionLog, DeliveryLog, TemperatureLog,
@@ -31,50 +31,54 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const [cleaningChecklistItems, setCleaningChecklistItems] = useState<CleaningChecklistItem[]>([]);
   const [users, setUsers] = useState<User[]>([]);
   const [systemParameters, setSystemParameters] = useState<SystemParameters>(initialSystemParameters);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const { toast } = useToast();
 
-  const fetchData = useCallback(async <T,>(endpoint: string, setter: React.Dispatch<React.SetStateAction<T[]>>, entityName: string) => {
+  const fetchData = useCallback(async () => {
+    setLoading(true);
+    setError(null);
     try {
-      const response = await fetch(`/api/${endpoint}`);
-      if (!response.ok) throw new Error(`Failed to fetch ${entityName}`);
-      const data: T[] = await response.json();
-      setter(data);
-    } catch (error) {
-      console.error(`Error loading ${entityName}:`, error);
-      toast({ title: "Error", description: `Could not load ${entityName}.`, variant: "destructive" });
+      const endpoints = [
+        'suppliers', 'appliances', 'production-logs', 'delivery-logs',
+        'temperature-logs', 'cleaning-tasks', 'cleaning-checklist-items',
+        'system-parameters'
+      ];
+      if (authUser && authUser.user_metadata?.role === 'admin') {
+        endpoints.push('users');
+      }
+      const responses = await Promise.all(endpoints.map(e => fetch(`/api/${e}`)));
+      const data = await Promise.all(responses.map(res => {
+        if (!res.ok) {
+          throw new Error(`Failed to fetch ${res.url}`);
+        }
+        return res.json();
+      }
+      ));
+      setSuppliers(data[0]);
+      setAppliances(data[1]);
+      setProductionLogs(data[2]);
+      setDeliveryLogs(data[3]);
+      setTemperatureLogs(data[4]);
+      setCleaningTasks(data[5]);
+      setCleaningChecklistItems(data[6]);
+      setSystemParameters(data[7]);
+      if (authUser && authUser.user_metadata?.role === 'admin') {
+        setUsers(data[8]);
+      } else {
+        setUsers([]);
+      }
+    } catch (error: any) {
+      setError(error.message);
+      toast({ title: "Error", description: "Could not load data.", variant: "destructive" });
+    } finally {
+      setLoading(false);
     }
-  }, [toast]);
-
-  const fetchSingleData = useCallback(async <T,>(endpoint: string, setter: React.Dispatch<React.SetStateAction<T>>, entityName: string, defaultValue: T) => {
-    try {
-      const response = await fetch(`/api/${endpoint}`);
-      if (!response.ok) throw new Error(`Failed to fetch ${entityName}`);
-      const data: T = await response.json();
-      setter(data);
-    } catch (error) {
-      console.error(`Error loading ${entityName}:`, error);
-      toast({ title: "Error", description: `Could not load ${entityName}.`, variant: "destructive" });
-      setter(defaultValue); // Set to default if fetch fails
-    }
-  }, [toast]);
+  }, [authUser, toast]);
 
   useEffect(() => {
-    fetchData<Supplier>('suppliers', setSuppliers, 'suppliers');
-    fetchData<Appliance>('appliances', setAppliances, 'appliances');
-    fetchData<ProductionLog>('production-logs', setProductionLogs, 'production logs');
-    fetchData<DeliveryLog>('delivery-logs', setDeliveryLogs, 'delivery logs');
-    fetchData<TemperatureLog>('temperature-logs', setTemperatureLogs, 'temperature logs');
-    fetchData<CleaningTask>('cleaning-tasks', setCleaningTasks, 'cleaning task definitions');
-    fetchData<CleaningChecklistItem>('cleaning-checklist-items', setCleaningChecklistItems, 'cleaning checklist items');
-    
-    if (authUser && authUser.user_metadata?.role === 'admin') {
-      fetchData<User>('users', setUsers, 'users');
-    } else {
-      setUsers([]);
-    }
-
-    fetchSingleData<SystemParameters>('system-parameters', setSystemParameters, 'system parameters', initialSystemParameters);
-  }, [fetchData, fetchSingleData, authUser]);
+    fetchData();
+  }, [fetchData]);
 
   const updateSystemParameters = async (newParams: SystemParameters) => {
      try {
@@ -154,14 +158,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
          toast({ title: `${entityName} Deleted`, variant: "destructive" });
       }
       // Re-fetch relevant data
-      if (endpoint.startsWith('suppliers')) fetchData<Supplier>('suppliers', setSuppliers, 'suppliers');
-      else if (endpoint.startsWith('appliances')) fetchData<Appliance>('appliances', setAppliances, 'appliances');
-      else if (endpoint.startsWith('production-logs')) fetchData<ProductionLog>('production-logs', setProductionLogs, 'production logs');
-      else if (endpoint.startsWith('delivery-logs')) fetchData<DeliveryLog>('delivery-logs', setDeliveryLogs, 'delivery logs');
-      else if (endpoint.startsWith('temperature-logs')) fetchData<TemperatureLog>('temperature-logs', setTemperatureLogs, 'temperature logs');
-      else if (endpoint.startsWith('cleaning-tasks')) fetchData<CleaningTask>('cleaning-tasks', setCleaningTasks, 'cleaning task definitions');
-      else if (endpoint.startsWith('cleaning-checklist-items')) fetchData<CleaningChecklistItem>('cleaning-checklist-items', setCleaningChecklistItems, 'cleaning checklist items');
-      else if (endpoint.startsWith('users')) fetchData<User>('users', setUsers, 'users');
+      fetchData();
       
       return result;
     } catch (error) {
@@ -203,6 +200,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const deleteCleaningTaskDefinition = (id: string) => makeApiRequest<null, void>('DELETE', 'cleaning-tasks', undefined, 'Cleaning Task Definition', '', id).then(() => {
     // Also remove related checklist items on the client if not handled by backend cascade (which it isn't for mock)
     setCleaningChecklistItems(prev => prev.filter(item => item.taskId !== id));
+    fetchData();
   });
   
   // Cleaning Checklist Item functions
@@ -276,12 +274,13 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     return activities
       .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
       .slice(0, limit);
-  }, [productionLogs, temperatureLogs, cleaningChecklistItems, deliveryLogs, appliances, users, suppliers, findUserById]);
+  }, [productionLogs, temperatureLogs, cleaningChecklistItems, deliveryLogs, appliances, suppliers, findUserById]);
 
 
-  const value: DataContextType = {
+  const value: DataContextType = useMemo(() => ({
     suppliers, appliances, productionLogs, deliveryLogs, temperatureLogs,
     cleaningTasks, cleaningChecklistItems, users, systemParameters,
+    loading, error,
     getRecentActivities, updateSystemParameters,
     addSupplier, updateSupplier, deleteSupplier,
     addAppliance, updateAppliance, deleteAppliance,
@@ -292,7 +291,20 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     updateCleaningChecklistItem,
     addUser, updateUser, deleteUser,
     findUserById, getApplianceEffectiveTempRange
-  };
+  }), [
+    suppliers, appliances, productionLogs, deliveryLogs, temperatureLogs, 
+    cleaningTasks, cleaningChecklistItems, users, systemParameters, loading, error, 
+    getRecentActivities, updateSystemParameters,
+    addSupplier, updateSupplier, deleteSupplier,
+    addAppliance, updateAppliance, deleteAppliance,
+    addProductionLog, updateProductionLog, deleteProductionLog,
+    addDeliveryLog, updateDeliveryLog, deleteDeliveryLog,
+    addTemperatureLog, updateTemperatureLog, deleteTemperatureLog,
+    addCleaningTaskDefinition, updateCleaningTaskDefinition, deleteCleaningTaskDefinition,
+    updateCleaningChecklistItem,
+    addUser, updateUser, deleteUser,
+    findUserById, getApplianceEffectiveTempRange
+  ]);
 
   return <DataContext.Provider value={value}>{children}</DataContext.Provider>;
 };

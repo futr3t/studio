@@ -137,6 +137,8 @@ export interface DataContextType {
   cleaningChecklistItems: CleaningChecklistItem[]; // Instances
   users: User[];
   systemParameters: SystemParameters;
+  loading: boolean;
+  error: string | null;
   getRecentActivities: (limit?: number) => ActivityFeedItem[];
 
   updateSystemParameters: (newParams: SystemParameters) => void;

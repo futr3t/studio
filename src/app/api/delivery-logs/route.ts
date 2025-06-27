@@ -1,22 +1,11 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
-import type { DeliveryLog, DeliveryItem } from '@/lib/types';
-import { withAuth } from '@/lib/auth-middleware';
+import { withAuth, withAdminAuth } from '@/lib/auth-middleware';
+import { createSupabaseAdminServerClient, createSupabaseServerClient } from '@/lib/supabase/server';
 
 async function getDeliveryLogsHandler(request: NextRequest, context: { user: any }) {
   try {
-    // Create authenticated Supabase client
-    const { createClient } = await import('@supabase/supabase-js');
-    const supabase = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!,
-      {
-        auth: {
-          autoRefreshToken: false,
-          persistSession: false
-        }
-      }
-    );
+    const supabase = createSupabaseServerClient();
 
     const { data: deliveryLogs, error } = await supabase
       .from('delivery_logs')
@@ -31,28 +20,7 @@ async function getDeliveryLogsHandler(request: NextRequest, context: { user: any
       return NextResponse.json({ message: error.message }, { status: 500 });
     }
 
-    // Convert to app types
-    const formattedLogs: DeliveryLog[] = deliveryLogs.map(log => ({
-      id: log.id,
-      supplierId: log.supplier_id,
-      deliveryTime: log.delivery_time,
-      items: log.delivery_items.map((item: any) => ({
-        name: item.name,
-        quantity: item.quantity,
-        unit: item.unit,
-        temperature: item.temperature,
-        isCompliant: item.is_compliant,
-        notes: item.notes,
-      })) as DeliveryItem[],
-      vehicleReg: log.vehicle_reg,
-      driverName: log.driver_name,
-      overallCondition: log.overall_condition,
-      isCompliant: log.is_compliant,
-      correctiveAction: log.corrective_action,
-      receivedBy: log.received_by,
-    }));
-
-    return NextResponse.json(formattedLogs);
+    return NextResponse.json(deliveryLogs);
   } catch (error) {
     console.error('Error fetching delivery logs:', error);
     return NextResponse.json({ message: 'Failed to fetch delivery logs' }, { status: 500 });
@@ -61,27 +29,14 @@ async function getDeliveryLogsHandler(request: NextRequest, context: { user: any
 
 async function createDeliveryLogHandler(request: NextRequest, context: { user: any }) {
   try {
-    const body = await request.json() as Omit<DeliveryLog, 'id' | 'deliveryTime'>;
+    const body = await request.json();
     
-    // Basic validation
     if (!body.supplierId || !body.items || body.items.length === 0) {
       return NextResponse.json({ message: 'Supplier ID and items are required' }, { status: 400 });
     }
 
-    // Create authenticated Supabase client
-    const { createClient } = await import('@supabase/supabase-js');
-    const supabase = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!,
-      {
-        auth: {
-          autoRefreshToken: false,
-          persistSession: false
-        }
-      }
-    );
+    const supabase = createSupabaseAdminServerClient();
 
-    // Create delivery log first
     const { data: deliveryLog, error: logError } = await supabase
       .from('delivery_logs')
       .insert({
@@ -102,8 +57,7 @@ async function createDeliveryLogHandler(request: NextRequest, context: { user: a
       return NextResponse.json({ message: logError.message }, { status: 500 });
     }
 
-    // Create delivery items
-    const deliveryItems = body.items.map(item => ({
+    const deliveryItems = body.items.map((item: any) => ({
       delivery_log_id: deliveryLog.id,
       name: item.name,
       quantity: item.quantity,
@@ -120,30 +74,13 @@ async function createDeliveryLogHandler(request: NextRequest, context: { user: a
 
     if (itemsError) {
       console.error('Error creating delivery items:', itemsError);
-      // Clean up the delivery log if items creation failed
       await supabase.from('delivery_logs').delete().eq('id', deliveryLog.id);
       return NextResponse.json({ message: itemsError.message }, { status: 500 });
     }
 
-    // Convert to app type
-    const newLog: DeliveryLog = {
-      id: deliveryLog.id,
-      supplierId: deliveryLog.supplier_id,
-      deliveryTime: deliveryLog.delivery_time,
-      items: createdItems.map(item => ({
-        name: item.name,
-        quantity: item.quantity,
-        unit: item.unit,
-        temperature: item.temperature,
-        isCompliant: item.is_compliant,
-        notes: item.notes,
-      })) as DeliveryItem[],
-      vehicleReg: deliveryLog.vehicle_reg,
-      driverName: deliveryLog.driver_name,
-      overallCondition: deliveryLog.overall_condition,
-      isCompliant: deliveryLog.is_compliant,
-      correctiveAction: deliveryLog.corrective_action,
-      receivedBy: deliveryLog.received_by,
+    const newLog = {
+      ...deliveryLog,
+      items: createdItems,
     };
 
     return NextResponse.json(newLog, { status: 201 });
@@ -155,6 +92,6 @@ async function createDeliveryLogHandler(request: NextRequest, context: { user: a
 }
 
 // GET: All authenticated users can read delivery logs
-// POST: All authenticated users can create delivery logs
+// POST: Only admins can create delivery logs
 export const GET = withAuth(getDeliveryLogsHandler);
-export const POST = withAuth(createDeliveryLogHandler);
+export const POST = withAdminAuth(createDeliveryLogHandler);

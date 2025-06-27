@@ -1,124 +1,83 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
-import { supabase } from '@/lib/supabase';
-import type { ProductionLog } from '@/lib/types';
+import { withAuth, withAdminAuth } from '@/lib/auth-middleware';
+import { createSupabaseAdminServerClient, createSupabaseServerClient } from '@/lib/supabase/server';
 
-export async function GET(
-  request: NextRequest,
-  { params }: { params: { id: string } }
-) {
+async function getProductionLogByIdHandler(request: NextRequest, context: { user: any }, params: { id: string }) {
   try {
+    const { id } = params;
+
+    const supabase = createSupabaseServerClient();
+
     const { data: productionLog, error } = await supabase
       .from('production_logs')
       .select('*')
-      .eq('id', params.id)
+      .eq('id', id)
       .single();
 
     if (error) {
-      if (error.code === 'PGRST116') {
-        return NextResponse.json({ message: 'Production log not found' }, { status: 404 });
-      }
-      console.error(`Error fetching production log ${params.id}:`, error);
-      return NextResponse.json({ message: error.message }, { status: 500 });
+      console.error(`Error fetching production log with ID ${id}:`, error);
+      return NextResponse.json({ message: `Production log with ID ${id} not found` }, { status: 404 });
     }
 
-    // Convert to app type
-    const formattedLog: ProductionLog = {
-      id: productionLog.id,
-      productName: productionLog.product_name,
-      batchCode: productionLog.batch_code,
-      logTime: productionLog.log_time,
-      criticalLimitDetails: productionLog.critical_limit_details,
-      isCompliant: productionLog.is_compliant,
-      correctiveAction: productionLog.corrective_action,
-      verifiedBy: productionLog.verified_by,
-    };
-
-    return NextResponse.json(formattedLog);
+    return NextResponse.json(productionLog);
   } catch (error) {
-    console.error(`Error fetching production log ${params.id}:`, error);
+    console.error(`Error fetching production log with ID ${params.id}:`, error);
     return NextResponse.json({ message: 'Failed to fetch production log' }, { status: 500 });
   }
 }
 
-export async function PUT(
-  request: NextRequest,
-  { params }: { params: { id: string } }
-) {
+async function updateProductionLogHandler(request: NextRequest, context: { user: any }, params: { id: string }) {
   try {
-    const body = await request.json() as Partial<ProductionLog>;
+    const { id } = params;
+    const body = await request.json();
 
-    // Basic validation
-    if (body.productName === '' || body.batchCode === '' || body.criticalLimitDetails === '') {
-      return NextResponse.json({ message: 'Product name, batch code, and critical limit details cannot be empty' }, { status: 400 });
-    }
-
-    const updateData: any = {};
-    if (body.productName !== undefined) updateData.product_name = body.productName;
-    if (body.batchCode !== undefined) updateData.batch_code = body.batchCode;
-    if (body.logTime !== undefined) updateData.log_time = body.logTime;
-    if (body.criticalLimitDetails !== undefined) updateData.critical_limit_details = body.criticalLimitDetails;
-    if (body.isCompliant !== undefined) updateData.is_compliant = body.isCompliant;
-    if (body.correctiveAction !== undefined) updateData.corrective_action = body.correctiveAction;
-    if (body.verifiedBy !== undefined) updateData.verified_by = body.verifiedBy;
-    updateData.updated_at = new Date().toISOString();
+    const supabase = createSupabaseAdminServerClient();
 
     const { data: productionLog, error } = await supabase
       .from('production_logs')
-      .update(updateData)
-      .eq('id', params.id)
+      .update(body)
+      .eq('id', id)
       .select()
       .single();
 
     if (error) {
-      if (error.code === 'PGRST116') {
-        return NextResponse.json({ message: 'Production log not found' }, { status: 404 });
-      }
-      console.error(`Error updating production log ${params.id}:`, error);
+      console.error(`Error updating production log with ID ${id}:`, error);
       return NextResponse.json({ message: error.message }, { status: 500 });
     }
 
-    // Convert to app type
-    const updatedLog: ProductionLog = {
-      id: productionLog.id,
-      productName: productionLog.product_name,
-      batchCode: productionLog.batch_code,
-      logTime: productionLog.log_time,
-      criticalLimitDetails: productionLog.critical_limit_details,
-      isCompliant: productionLog.is_compliant,
-      correctiveAction: productionLog.corrective_action,
-      verifiedBy: productionLog.verified_by,
-    };
-
-    return NextResponse.json(updatedLog);
+    return NextResponse.json(productionLog);
   } catch (error: any) {
-    console.error(`Error updating production log ${params.id}:`, error);
+    console.error(`Error updating production log with ID ${params.id}:`, error);
     const errorMessage = error.message || 'Failed to update production log';
     return NextResponse.json({ message: errorMessage }, { status: 500 });
   }
 }
 
-export async function DELETE(
-  request: NextRequest,
-  { params }: { params: { id: string } }
-) {
+async function deleteProductionLogHandler(request: NextRequest, context: { user: any }, params: { id: string }) {
   try {
+    const { id } = params;
+
+    const supabase = createSupabaseAdminServerClient();
+
     const { error } = await supabase
       .from('production_logs')
       .delete()
-      .eq('id', params.id);
+      .eq('id', id);
 
     if (error) {
-      console.error(`Error deleting production log ${params.id}:`, error);
+      console.error(`Error deleting production log with ID ${id}:`, error);
       return NextResponse.json({ message: error.message }, { status: 500 });
     }
 
-    return NextResponse.json({ 
-      message: 'Production log deleted successfully', 
-      deletedLogId: params.id 
-    });
+    return new NextResponse(null, { status: 204 }); // No Content
   } catch (error) {
-    console.error(`Error deleting production log ${params.id}:`, error);
+    console.error(`Error deleting production log with ID ${params.id}:`, error);
     return NextResponse.json({ message: 'Failed to delete production log' }, { status: 500 });
   }
 }
+
+// All authenticated users can perform these actions
+export const GET = withAuth(getProductionLogByIdHandler);
+export const PUT = withAdminAuth(updateProductionLogHandler);
+export const DELETE = withAdminAuth(deleteProductionLogHandler);
