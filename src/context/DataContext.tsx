@@ -83,8 +83,11 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   }, [authUser, toast]);
 
   useEffect(() => {
-    fetchData();
-  }, [fetchData]);
+    // Only fetch data when user is authenticated (not null or undefined)
+    if (authUser) {
+      fetchData();
+    }
+  }, [authUser, fetchData]);
 
   const updateSystemParameters = async (newParams: SystemParameters) => {
      try {

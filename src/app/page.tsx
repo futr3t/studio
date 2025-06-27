@@ -35,7 +35,7 @@ const chartConfig = {
 } satisfies ChartConfig
 
 
-export default function DashboardPage() {
+function DashboardContent() {
   const { 
     productionLogs, 
     temperatureLogs, 
@@ -107,9 +107,7 @@ export default function DashboardPage() {
     return <div>Error: {error}</div>;
   }
 
-
   return (
-    <AuthWrapper>
       <div className="flex flex-col min-h-screen">
         <MainNav />
         <main className="flex-1 p-4 md:p-8 space-y-6">
@@ -248,6 +246,13 @@ export default function DashboardPage() {
         </div>
       </main>
     </div>
+  );
+}
+
+export default function DashboardPage() {
+  return (
+    <AuthWrapper>
+      <DashboardContent />
     </AuthWrapper>
   );
 }
