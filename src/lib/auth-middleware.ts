@@ -43,17 +43,29 @@ export function withAdminAuth(
 ) {
   return async function (request: NextRequest, params?: any) {
     try {
-      const supabase = createSupabaseAdminServerClient();
-      const { data: { session }, error } = await supabase.auth.getSession();
-
-      if (error || !session?.user) {
+      // Get the Authorization header
+      const authHeader = request.headers.get('authorization');
+      const accessToken = authHeader?.replace('Bearer ', '');
+      
+      if (!accessToken) {
         return NextResponse.json(
           { error: 'Unauthorized' }, 
           { status: 401 }
         );
       }
 
-      const userRole = session.user.user_metadata?.role;
+      // Verify the token with Supabase
+      const supabase = createSupabaseServerClient();
+      const { data: { user }, error } = await supabase.auth.getUser(accessToken);
+
+      if (error || !user) {
+        return NextResponse.json(
+          { error: 'Unauthorized' }, 
+          { status: 401 }
+        );
+      }
+
+      const userRole = user.user_metadata?.role;
       
       if (userRole !== 'admin') {
         return NextResponse.json(
@@ -62,7 +74,7 @@ export function withAdminAuth(
         );
       }
 
-      return await handler(request, { user: session.user }, params);
+      return await handler(request, { user }, params);
     } catch (error) {
       console.error('Admin auth middleware error:', error);
       return NextResponse.json(

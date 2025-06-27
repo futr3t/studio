@@ -1,10 +1,19 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
-import { withAdminAuth } from '@/lib/auth-middleware';
+import { withAuth, withAdminAuth } from '@/lib/auth-middleware';
 import { createSupabaseAdminServerClient } from '@/lib/supabase/server';
 
 async function getUsersHandler(request: NextRequest, context: { user: any }) {
   try {
+    // Check if user is admin
+    const userRole = context.user.user_metadata?.role;
+    if (userRole !== 'admin') {
+      return NextResponse.json(
+        { error: 'Forbidden - Admin access required' }, 
+        { status: 403 }
+      );
+    }
+
     const supabase = createSupabaseAdminServerClient();
 
     const { data: users, error } = await supabase
@@ -53,6 +62,7 @@ async function createUserHandler(request: NextRequest, context: { user: any }) {
   }
 }
 
-// Apply admin authentication to both routes
-export const GET = withAdminAuth(getUsersHandler);
+// GET: Use withAuth with internal admin check for better error handling
+// POST: Keep withAdminAuth for user creation
+export const GET = withAuth(getUsersHandler);
 export const POST = withAdminAuth(createUserHandler);
