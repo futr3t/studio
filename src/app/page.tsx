@@ -52,7 +52,9 @@ function DashboardContent() {
   }, [getRecentActivities, loading, error]);
 
   const complianceData = useMemo(() => {
-    if (loading || error) return { rate: 100, chartData: [] };
+    if (loading || error || !productionLogs || !temperatureLogs || !deliveryLogs) {
+      return { rate: 100, chartData: [] };
+    }
     
     const allLogs = [
       ...productionLogs.map(l => ({ ...l, type: 'Production', time: l.logTime })),
@@ -92,12 +94,12 @@ function DashboardContent() {
   }, [productionLogs, temperatureLogs, deliveryLogs, loading, error]);
 
   const pendingCleaningTasks = useMemo(() => {
-    if (loading || error) return 0;
+    if (loading || error || !cleaningChecklistItems) return 0;
     return cleaningChecklistItems.filter(item => !item.completed).length;
   }, [cleaningChecklistItems, loading, error]);
 
   const activeAlertsCount = useMemo(() => {
-    if (loading || error) return 0;
+    if (loading || error || !productionLogs || !temperatureLogs || !deliveryLogs) return 0;
     return [
       ...productionLogs.filter(l => !l.isCompliant),
       ...temperatureLogs.filter(l => !l.isCompliant),

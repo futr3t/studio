@@ -36,11 +36,8 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const { toast } = useToast();
 
   const fetchData = useCallback(async () => {
-    console.log('fetchData called:', { hasAuthUser: !!authUser, hasSession: !!session });
-    
     // Only fetch data if user is authenticated
     if (!authUser) {
-      console.log('No authUser, skipping data fetch');
       setLoading(false);
       return;
     }
@@ -52,7 +49,6 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       return;
     }
     
-    console.log('Starting data fetch for user:', authUser.id);
     setLoading(true);
     setError(null);
     try {
@@ -268,6 +264,11 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   const getRecentActivities = useCallback((limit: number = 5): ActivityFeedItem[] => {
     const activities: ActivityFeedItem[] = [];
+
+    // Ensure arrays exist before using forEach
+    if (!productionLogs || !temperatureLogs || !deliveryLogs || !cleaningChecklistItems || !appliances) {
+      return [];
+    }
 
     productionLogs.forEach(log => {
       const verifier = log.verifiedBy ? findUserById(log.verifiedBy) : null;
