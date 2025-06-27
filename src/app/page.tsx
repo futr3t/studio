@@ -21,6 +21,7 @@ import { enUS } from 'date-fns/locale';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import { AuthWrapper } from '@/components/auth/AuthWrapper';
+import { safeLength, safeMap, safeFilter, ensureArray } from '@/lib/array-utils';
 
 
 const chartConfig = {
@@ -52,14 +53,14 @@ function DashboardContent() {
   }, [getRecentActivities, loading, error]);
 
   const complianceData = useMemo(() => {
-    if (loading || error || !productionLogs || !temperatureLogs || !deliveryLogs) {
+    if (loading || error) {
       return { rate: 100, chartData: [] };
     }
     
     const allLogs = [
-      ...productionLogs.map(l => ({ ...l, type: 'Production', time: l.logTime })),
-      ...temperatureLogs.map(l => ({ ...l, type: 'Temperature', time: l.logTime })),
-      ...deliveryLogs.map(l => ({ ...l, type: 'Delivery', time: l.deliveryTime })),
+      ...safeMap(productionLogs, l => ({ ...l, type: 'Production', time: l.logTime })),
+      ...safeMap(temperatureLogs, l => ({ ...l, type: 'Temperature', time: l.logTime })),
+      ...safeMap(deliveryLogs, l => ({ ...l, type: 'Delivery', time: l.deliveryTime })),
     ];
     
     const compliantCount = allLogs.filter(l => l.isCompliant).length;
@@ -94,16 +95,16 @@ function DashboardContent() {
   }, [productionLogs, temperatureLogs, deliveryLogs, loading, error]);
 
   const pendingCleaningTasks = useMemo(() => {
-    if (loading || error || !cleaningChecklistItems) return 0;
-    return cleaningChecklistItems.filter(item => !item.completed).length;
+    if (loading || error) return 0;
+    return safeLength(safeFilter(cleaningChecklistItems, item => !item.completed));
   }, [cleaningChecklistItems, loading, error]);
 
   const activeAlertsCount = useMemo(() => {
-    if (loading || error || !productionLogs || !temperatureLogs || !deliveryLogs) return 0;
+    if (loading || error) return 0;
     return [
-      ...productionLogs.filter(l => !l.isCompliant),
-      ...temperatureLogs.filter(l => !l.isCompliant),
-      ...deliveryLogs.filter(l => !l.isCompliant)
+      ...safeFilter(productionLogs, l => !l.isCompliant),
+      ...safeFilter(temperatureLogs, l => !l.isCompliant),
+      ...safeFilter(deliveryLogs, l => !l.isCompliant)
     ].length;
   }, [productionLogs, temperatureLogs, deliveryLogs, loading, error]);
 

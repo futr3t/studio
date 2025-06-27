@@ -250,7 +250,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const updateCleaningTaskDefinition = (data: CleaningTask) => makeApiRequest<CleaningTask, CleaningTask>('PUT', 'cleaning-tasks', data, 'Cleaning Task Definition', 'Updated', data.id);
   const deleteCleaningTaskDefinition = (id: string) => makeApiRequest<null, void>('DELETE', 'cleaning-tasks', undefined, 'Cleaning Task Definition', '', id).then(() => {
     // Also remove related checklist items on the client if not handled by backend cascade (which it isn't for mock)
-    setCleaningChecklistItems(prev => prev.filter(item => item.taskId !== id));
+    setCleaningChecklistItems(prev => (prev || []).filter(item => item.taskId !== id));
     fetchData();
   });
   
@@ -319,7 +319,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             id: `del-${log.id}`,
             logType: 'delivery',
             timestamp: log.deliveryTime,
-            description: `Delivery: From ${supplier?.name || 'Unknown'} (${log.items.length} items)`,
+            description: `Delivery: From ${supplier?.name || 'Unknown'} (${log.items?.length || 0} items)`,
             user: receiverUser?.name,
             statusIcon: log.isCompliant ? CheckCircle2 : AlertTriangle,
             itemIcon: Truck,
