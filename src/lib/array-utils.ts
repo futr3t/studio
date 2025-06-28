@@ -43,3 +43,11 @@ export function safeFind<T>(array: T[] | undefined | null, callback: (item: T, i
 export function ensureArray<T>(array: T[] | undefined | null): T[] {
   return array || [];
 }
+
+/**
+ * Safely extract username from email, returns email as fallback
+ */
+export function safeExtractUsername(email: string | undefined | null): string {
+  if (!email || typeof email !== 'string') return '';
+  return email.replace('@chefcheck.local', '');
+}

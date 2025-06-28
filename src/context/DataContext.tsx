@@ -151,7 +151,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     if (typeof appliance.minTemp === 'number' && typeof appliance.maxTemp === 'number') {
       return { min: appliance.minTemp, max: appliance.maxTemp };
     }
-    const typeKey = appliance.type.toLowerCase().replace(/\s+/g, '');
+    const typeKey = (appliance.type || '').toLowerCase().replace(/\s+/g, '');
     if (typeKey.includes('fridge')) return systemParameters.temperatureRanges.fridge;
     if (typeKey.includes('freezer')) return systemParameters.temperatureRanges.freezer;
     if (typeKey.includes('hothold') || typeKey.includes('bainmarie') || typeKey.includes('oven')) return systemParameters.temperatureRanges.hotHold;

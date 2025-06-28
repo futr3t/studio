@@ -35,7 +35,7 @@ import { enUS } from 'date-fns/locale';
 import { useData } from '@/context/DataContext';
 import { AuthWrapper } from '@/components/auth/AuthWrapper';
 import { useAuth } from '@/context/AuthContext';
-import { safeLength, safeMap, safeFilter, ensureArray } from '@/lib/array-utils';
+import { safeLength, safeMap, safeFilter, ensureArray, safeExtractUsername } from '@/lib/array-utils';
 
 // Schemas for forms
 const supplierSchema = z.object({
@@ -364,7 +364,7 @@ export default function SettingsPage() {
                   <TableBody>
                     {safeMap(users, user => (
                       <TableRow key={user.id}>
-                        <TableCell>{user.name}</TableCell><TableCell>{user.email?.replace('@chefcheck.local', '') || user.email}</TableCell>
+                        <TableCell>{user.name}</TableCell><TableCell>{safeExtractUsername(user.email) || user.email || 'N/A'}</TableCell>
                         <TableCell><Badge variant={user.role === 'admin' ? "default" : "secondary"}>{user.role.charAt(0).toUpperCase() + user.role.slice(1)}</Badge></TableCell>
                         <TableCell>
                           <Popover>
@@ -446,7 +446,7 @@ export default function SettingsPage() {
 
         <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
           <DialogContent className="sm:max-w-lg">
-            <DialogHeader><DialogTitle>{editingItem ? "Edit" : "Add New"} {currentForm?.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase())}</DialogTitle></DialogHeader>
+            <DialogHeader><DialogTitle>{editingItem ? "Edit" : "Add New"} {(currentForm || '').replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase())}</DialogTitle></DialogHeader>
             <div className="py-4 max-h-[70vh] overflow-y-auto pr-2">
             {currentForm === "supplier" && (
               <form onSubmit={supplierForm.handleSubmit(handleSupplierSubmit)} className="space-y-4">

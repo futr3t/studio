@@ -21,6 +21,7 @@ import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { LogoIcon } from "@/components/icons/logo-icon";
 import { useAuth } from "@/context/AuthContext";
+import { safeExtractUsername } from "@/lib/array-utils";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -48,7 +49,7 @@ export function MainNav() {
   const { user, signOut } = useAuth();
 
   const userRole = user?.user_metadata?.role as 'admin' | 'staff' | undefined;
-  const userName = user?.user_metadata?.name || user?.user_metadata?.username || user?.email?.replace('@chefcheck.local', '') || 'User';
+  const userName = user?.user_metadata?.name || user?.user_metadata?.username || safeExtractUsername(user?.email) || 'User';
 
   const navItems = userRole === 'admin' 
     ? [...navItemsBase, settingsNavItem] 
