@@ -27,6 +27,7 @@ import { Calendar } from '@/components/ui/calendar';
 import { cn } from '@/lib/utils';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useData } from '@/context/DataContext'; // Import useData hook
+import { safeLength, safeMap, safeFilter, safeFind, ensureArray } from '@/lib/array-utils';
 
 // Assume a current user for example purposes - this would typically come from auth
 const MOCK_CURRENT_USER_ID = 'user1'; // Alice Wonderland
@@ -45,17 +46,17 @@ export default function CleaningPage() {
 
   // The checklist displayed is now derived directly from the context state
   const filteredChecklist = useMemo(() => {
-    let items = [...cleaningChecklistItems];
+    let items = ensureArray(cleaningChecklistItems);
     if (filterFrequency !== 'all') {
-      items = items.filter(item => item.frequency === filterFrequency);
+      items = safeFilter(items, item => item.frequency === filterFrequency);
     }
     if (filterStatus === 'completed') {
-      items = items.filter(item => item.completed);
+      items = safeFilter(items, item => item.completed);
     } else if (filterStatus === 'pending') {
-      items = items.filter(item => !item.completed);
+      items = safeFilter(items, item => !item.completed);
     }
     if (filterDate) {
-       items = items.filter(item => {
+       items = safeFilter(items, item => {
         if (!item.completedAt) return filterStatus === 'pending'; // Only show pending if filtering by date and item not completed
         return format(parseISO(item.completedAt), 'yyyy-MM-dd', { locale: enUS }) === format(filterDate, 'yyyy-MM-dd', { locale: enUS });
       });
@@ -175,10 +176,10 @@ export default function CleaningPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredChecklist.length === 0 && (
+                {safeLength(filteredChecklist) === 0 && (
                   <TableRow><TableCell colSpan={7} className="text-center">No cleaning tasks match your filters, or no tasks available.</TableCell></TableRow>
                 )}
-                {filteredChecklist.map((item) => {
+                {safeMap(filteredChecklist, (item) => {
                   const completedByUser = item.completedBy ? findUserById(item.completedBy)?.name : undefined;
                   return (
                     <TableRow key={item.id} className={item.completed ? "" : "font-semibold"}>
@@ -220,7 +221,7 @@ export default function CleaningPage() {
                         <Select value={completedByUserId} onValueChange={setCompletedByUserId}>
                             <SelectTrigger id="completedBy"><SelectValue placeholder="Select user" /></SelectTrigger>
                             <SelectContent>
-                                {users.map(user => (
+                                {safeMap(users, user => (
                                     <SelectItem key={user.id} value={user.id}>{user.name}</SelectItem>
                                 ))}
                             </SelectContent>

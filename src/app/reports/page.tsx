@@ -18,6 +18,7 @@ import { useData } from '@/context/DataContext';
 import type { ProductionLog, DeliveryLog, TemperatureLog, CleaningChecklistItem, Supplier, Appliance, User } from '@/lib/types';
 import jsPDF from 'jspdf';
 import 'jspdf-autotable';
+import { safeLength, safeMap, safeFilter, ensureArray } from '@/lib/array-utils';
 // Remove dependency on mock data - use current date instead
 const STATIC_NOW = new Date(); 
 
@@ -153,8 +154,8 @@ export default function ReportsPage() {
     const to = endOfDay(generalReportDateRange.to);
     const interval = { start: from, end: to };
 
-    const filteredProductionLogs = productionLogs.filter(log => isWithinInterval(parseISO(log.logTime), interval));
-    const productionReportData = filteredProductionLogs.map(log => [
+    const filteredProductionLogs = safeFilter(productionLogs, log => isWithinInterval(parseISO(log.logTime), interval));
+    const productionReportData = safeMap(filteredProductionLogs, log => [
       log.productName,
       log.batchCode,
       format(parseISO(log.logTime), "PPpp", { locale: enUS }),
@@ -164,19 +165,19 @@ export default function ReportsPage() {
       getUserName(log.verifiedBy)
     ]);
 
-    const filteredDeliveryLogs = deliveryLogs.filter(log => isWithinInterval(parseISO(log.deliveryTime), interval));
-    const deliveryReportData = filteredDeliveryLogs.map(log => [
+    const filteredDeliveryLogs = safeFilter(deliveryLogs, log => isWithinInterval(parseISO(log.deliveryTime), interval));
+    const deliveryReportData = safeMap(filteredDeliveryLogs, log => [
       format(parseISO(log.deliveryTime), "PPpp", { locale: enUS }),
       getSupplierName(log.supplierId),
-      log.items.map(item => `${item.name} (Qty: ${item.quantity} ${item.unit}, Temp: ${item.temperature ?? 'N/A'}°C, ${item.isCompliant ? 'OK' : 'Not OK'})`).join('; ') || "N/A",
+      safeMap(log.items, item => `${item.name} (Qty: ${item.quantity} ${item.unit}, Temp: ${item.temperature ?? 'N/A'}°C, ${item.isCompliant ? 'OK' : 'Not OK'})`).join('; ') || "N/A",
       log.isCompliant ? "Compliant" : "Non-Compliant",
       log.correctiveAction || "N/A",
       getUserName(log.receivedBy),
       log.vehicleReg || "N/A",
     ]);
     
-    const filteredTemperatureLogs = temperatureLogs.filter(log => isWithinInterval(parseISO(log.logTime), interval));
-    const temperatureReportData = filteredTemperatureLogs.map(log => [
+    const filteredTemperatureLogs = safeFilter(temperatureLogs, log => isWithinInterval(parseISO(log.logTime), interval));
+    const temperatureReportData = safeMap(filteredTemperatureLogs, log => [
       getApplianceName(log.applianceId),
       `${log.temperature.toFixed(1)}°C`,
       format(parseISO(log.logTime), "PPpp", { locale: enUS }),
@@ -185,10 +186,10 @@ export default function ReportsPage() {
       getUserName(log.loggedBy),
     ]);
 
-    const filteredCleaningItems = cleaningChecklistItems.filter(item => 
-      item.completed && item.completedAt && isWithinInterval(parseISO(item.completedAt), interval)
+    const filteredCleaningItems = safeFilter(cleaningChecklistItems, (item): boolean => 
+      Boolean(item.completed) && Boolean(item.completedAt) && isWithinInterval(parseISO(item.completedAt!), interval)
     );
-    const cleaningReportData = filteredCleaningItems.map(item => [
+    const cleaningReportData = safeMap(filteredCleaningItems, item => [
       item.name,
       item.area,
       item.frequency,

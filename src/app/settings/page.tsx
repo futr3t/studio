@@ -35,6 +35,7 @@ import { enUS } from 'date-fns/locale';
 import { useData } from '@/context/DataContext';
 import { AuthWrapper } from '@/components/auth/AuthWrapper';
 import { useAuth } from '@/context/AuthContext';
+import { safeLength, safeMap, safeFilter, ensureArray } from '@/lib/array-utils';
 
 // Schemas for forms
 const supplierSchema = z.object({
@@ -288,7 +289,7 @@ export default function SettingsPage() {
                 <Table>
                   <TableHeader><TableRow><TableHead>Name</TableHead><TableHead>Contact Person</TableHead><TableHead>Phone</TableHead><TableHead>Email</TableHead><TableHead className="text-right">Actions</TableHead></TableRow></TableHeader>
                   <TableBody>
-                    {suppliers.map(s => (
+                    {safeMap(suppliers, s => (
                       <TableRow key={s.id}>
                         <TableCell>{s.name}</TableCell><TableCell>{s.contactPerson || 'N/A'}</TableCell>
                         <TableCell>{s.phone || 'N/A'}</TableCell><TableCell>{s.email || 'N/A'}</TableCell>
@@ -312,7 +313,7 @@ export default function SettingsPage() {
                  <Table>
                   <TableHeader><TableRow><TableHead>Name</TableHead><TableHead>Location</TableHead><TableHead>Type</TableHead><TableHead>Min Temp (°C)</TableHead><TableHead>Max Temp (°C)</TableHead><TableHead className="text-right">Actions</TableHead></TableRow></TableHeader>
                   <TableBody>
-                    {appliances.map(a => (
+                    {safeMap(appliances, a => (
                       <TableRow key={a.id}>
                         <TableCell>{a.name}</TableCell><TableCell>{a.location}</TableCell><TableCell>{a.type}</TableCell>
                         <TableCell>{a.minTemp ?? 'N/A'}</TableCell><TableCell>{a.maxTemp ?? 'N/A'}</TableCell>
@@ -336,7 +337,7 @@ export default function SettingsPage() {
                  <Table>
                   <TableHeader><TableRow><TableHead>Name</TableHead><TableHead>Area</TableHead><TableHead>Frequency</TableHead><TableHead>Description</TableHead><TableHead className="text-right">Actions</TableHead></TableRow></TableHeader>
                   <TableBody>
-                    {cleaningTasks.map(t => ( 
+                    {safeMap(cleaningTasks, t => ( 
                       <TableRow key={t.id}>
                         <TableCell>{t.name}</TableCell><TableCell>{t.area}</TableCell>
                         <TableCell><Badge variant="secondary">{getFrequencyLabel(t.frequency)}</Badge></TableCell>
@@ -361,7 +362,7 @@ export default function SettingsPage() {
                 <Table>
                   <TableHeader><TableRow><TableHead>Name</TableHead><TableHead>Username</TableHead><TableHead>Role</TableHead><TableHead>Training Records</TableHead><TableHead className="text-right">Actions</TableHead></TableRow></TableHeader>
                   <TableBody>
-                    {users.map(user => (
+                    {safeMap(users, user => (
                       <TableRow key={user.id}>
                         <TableCell>{user.name}</TableCell><TableCell>{user.email?.replace('@chefcheck.local', '') || user.email}</TableCell>
                         <TableCell><Badge variant={user.role === 'admin' ? "default" : "secondary"}>{user.role.charAt(0).toUpperCase() + user.role.slice(1)}</Badge></TableCell>
@@ -372,7 +373,7 @@ export default function SettingsPage() {
                               <div className="grid gap-4"><div className="space-y-2"><h4 className="font-medium leading-none">Training Records</h4><p className="text-sm text-muted-foreground">Details of training completed by {user.name}.</p></div>
                                 {user.trainingRecords && user.trainingRecords.length > 0 ? (
                                   <ul className="list-disc pl-5 space-y-1 text-sm">
-                                    {user.trainingRecords.map((record, idx) => (
+                                    {safeMap(user.trainingRecords, (record, idx) => (
                                       <li key={idx}>
                                         <strong>{record.name}</strong>
                                         <br />Completed: {record.dateCompleted && isValid(parse(record.dateCompleted, 'yyyy-MM-dd', new Date())) ? format(parse(record.dateCompleted, 'yyyy-MM-dd', new Date()), 'PP', { locale: enUS }) : 'N/A'}

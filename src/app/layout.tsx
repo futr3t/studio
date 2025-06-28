@@ -1,7 +1,15 @@
 import type {Metadata} from 'next';
 import './globals.css';
+import { Inter } from 'next/font/google';
 import { Toaster } from "@/components/ui/toaster";
 import AppProviders from '@/components/layout/app-providers';
+
+const inter = Inter({
+  subsets: ['latin'],
+  weight: ['400', '500', '600', '700'],
+  variable: '--font-inter',
+  display: 'swap',
+});
 
 export const metadata: Metadata = {
   title: 'ChefCheck',
@@ -15,12 +23,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <head>
-        <link rel="preconnect" href="https://fonts.googleapis.com" />
-        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
-        <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
-      </head>
-      <body className="font-body antialiased min-h-screen flex flex-col">
+      <body className={`${inter.variable} font-body antialiased min-h-screen flex flex-col`}>
         <AppProviders>
           {children}
           <Toaster />

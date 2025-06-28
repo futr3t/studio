@@ -121,7 +121,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     }
   }, [authUser, fetchData]);
 
-  const updateSystemParameters = async (newParams: SystemParameters) => {
+  const updateSystemParameters = useCallback(async (newParams: SystemParameters) => {
      try {
       const headers: HeadersInit = { 'Content-Type': 'application/json' };
       if (session?.access_token) {
@@ -141,7 +141,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       console.error("Error updating system parameters:", error);
       toast({ title: "Error", description: "Could not update system parameters.", variant: "destructive" });
     }
-  };
+  }, [session, toast]);
 
   const findUserById = useCallback((userId: string): User | undefined => {
     return users.find(u => u.id === userId);
@@ -159,7 +159,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   }, [systemParameters.temperatureRanges]);
 
   // Generic CRUD operations
-  const makeApiRequest = async <T, U>(
+  const makeApiRequest = useCallback(async <T, U>(
     method: 'POST' | 'PUT' | 'DELETE',
     endpoint: string,
     body?: U,
@@ -217,50 +217,50 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       toast({ title: "Error", description: (error as Error).message || `Could not perform operation on ${entityName || 'item'}.`, variant: "destructive" });
       return null;
     }
-  };
+  }, [session, toast, fetchData]);
 
 
   // Supplier functions
-  const addSupplier = (data: Omit<Supplier, 'id'>) => makeApiRequest<Supplier, Omit<Supplier, 'id'>>('POST', 'suppliers', data, 'Supplier', 'Added');
-  const updateSupplier = (data: Supplier) => makeApiRequest<Supplier, Supplier>('PUT', 'suppliers', data, 'Supplier', 'Updated', data.id);
-  const deleteSupplier = (id: string) => makeApiRequest<null, void>('DELETE', 'suppliers', undefined, 'Supplier', '', id);
+  const addSupplier = useCallback((data: Omit<Supplier, 'id'>) => makeApiRequest<Supplier, Omit<Supplier, 'id'>>('POST', 'suppliers', data, 'Supplier', 'Added'), [makeApiRequest]);
+  const updateSupplier = useCallback((data: Supplier) => makeApiRequest<Supplier, Supplier>('PUT', 'suppliers', data, 'Supplier', 'Updated', data.id), [makeApiRequest]);
+  const deleteSupplier = useCallback((id: string) => makeApiRequest<null, void>('DELETE', 'suppliers', undefined, 'Supplier', '', id), [makeApiRequest]);
 
   // Appliance functions
-  const addAppliance = (data: Omit<Appliance, 'id'>) => makeApiRequest<Appliance, Omit<Appliance, 'id'>>('POST', 'appliances', data, 'Appliance', 'Added');
-  const updateAppliance = (data: Appliance) => makeApiRequest<Appliance, Appliance>('PUT', 'appliances', data, 'Appliance', 'Updated', data.id);
-  const deleteAppliance = (id: string) => makeApiRequest<null, void>('DELETE', 'appliances', undefined, 'Appliance', '', id);
+  const addAppliance = useCallback((data: Omit<Appliance, 'id'>) => makeApiRequest<Appliance, Omit<Appliance, 'id'>>('POST', 'appliances', data, 'Appliance', 'Added'), [makeApiRequest]);
+  const updateAppliance = useCallback((data: Appliance) => makeApiRequest<Appliance, Appliance>('PUT', 'appliances', data, 'Appliance', 'Updated', data.id), [makeApiRequest]);
+  const deleteAppliance = useCallback((id: string) => makeApiRequest<null, void>('DELETE', 'appliances', undefined, 'Appliance', '', id), [makeApiRequest]);
 
   // Production Log functions
-  const addProductionLog = (data: Omit<ProductionLog, 'id' | 'logTime'>) => makeApiRequest<ProductionLog, Omit<ProductionLog, 'id' | 'logTime'>>('POST', 'production-logs', data, 'Production Log', 'Added');
-  const updateProductionLog = (data: ProductionLog) => makeApiRequest<ProductionLog, ProductionLog>('PUT', 'production-logs', data, 'Production Log', 'Updated', data.id);
-  const deleteProductionLog = (id: string) => makeApiRequest<null, void>('DELETE', 'production-logs', undefined, 'Production Log', '', id);
+  const addProductionLog = useCallback((data: Omit<ProductionLog, 'id' | 'logTime'>) => makeApiRequest<ProductionLog, Omit<ProductionLog, 'id' | 'logTime'>>('POST', 'production-logs', data, 'Production Log', 'Added'), [makeApiRequest]);
+  const updateProductionLog = useCallback((data: ProductionLog) => makeApiRequest<ProductionLog, ProductionLog>('PUT', 'production-logs', data, 'Production Log', 'Updated', data.id), [makeApiRequest]);
+  const deleteProductionLog = useCallback((id: string) => makeApiRequest<null, void>('DELETE', 'production-logs', undefined, 'Production Log', '', id), [makeApiRequest]);
 
   // Delivery Log functions
-  const addDeliveryLog = (data: Omit<DeliveryLog, 'id' | 'deliveryTime'>) => makeApiRequest<DeliveryLog, Omit<DeliveryLog, 'id' | 'deliveryTime'>>('POST', 'delivery-logs', data, 'Delivery Log', 'Added');
-  const updateDeliveryLog = (data: DeliveryLog) => makeApiRequest<DeliveryLog, DeliveryLog>('PUT', 'delivery-logs', data, 'Delivery Log', 'Updated', data.id);
-  const deleteDeliveryLog = (id: string) => makeApiRequest<null, void>('DELETE', 'delivery-logs', undefined, 'Delivery Log', '', id);
+  const addDeliveryLog = useCallback((data: Omit<DeliveryLog, 'id' | 'deliveryTime'>) => makeApiRequest<DeliveryLog, Omit<DeliveryLog, 'id' | 'deliveryTime'>>('POST', 'delivery-logs', data, 'Delivery Log', 'Added'), [makeApiRequest]);
+  const updateDeliveryLog = useCallback((data: DeliveryLog) => makeApiRequest<DeliveryLog, DeliveryLog>('PUT', 'delivery-logs', data, 'Delivery Log', 'Updated', data.id), [makeApiRequest]);
+  const deleteDeliveryLog = useCallback((id: string) => makeApiRequest<null, void>('DELETE', 'delivery-logs', undefined, 'Delivery Log', '', id), [makeApiRequest]);
   
   // Temperature Log functions (add/update need appliance for compliance check on API side for now)
-  const addTemperatureLog = (data: Omit<TemperatureLog, 'id' | 'logTime' | 'isCompliant'>, appliance: Appliance) => makeApiRequest<TemperatureLog, Omit<TemperatureLog, 'id' | 'logTime' | 'isCompliant'> & {applianceId: string}>('POST', 'temperature-logs', {...data, applianceId: appliance.id}, 'Temperature Log', 'Added');
-  const updateTemperatureLog = (data: Omit<TemperatureLog, 'isCompliant'>, appliance: Appliance) => makeApiRequest<TemperatureLog, Omit<TemperatureLog, 'isCompliant'> & {applianceId: string}>('PUT', 'temperature-logs', {...data, applianceId: appliance.id}, 'Temperature Log', 'Updated', data.id);
-  const deleteTemperatureLog = (id: string) => makeApiRequest<null, void>('DELETE', 'temperature-logs', undefined, 'Temperature Log', '', id);
+  const addTemperatureLog = useCallback((data: Omit<TemperatureLog, 'id' | 'logTime' | 'isCompliant'>, appliance: Appliance) => makeApiRequest<TemperatureLog, Omit<TemperatureLog, 'id' | 'logTime' | 'isCompliant'> & {applianceId: string}>('POST', 'temperature-logs', {...data, applianceId: appliance.id}, 'Temperature Log', 'Added'), [makeApiRequest]);
+  const updateTemperatureLog = useCallback((data: Omit<TemperatureLog, 'isCompliant'>, appliance: Appliance) => makeApiRequest<TemperatureLog, Omit<TemperatureLog, 'isCompliant'> & {applianceId: string}>('PUT', 'temperature-logs', {...data, applianceId: appliance.id}, 'Temperature Log', 'Updated', data.id), [makeApiRequest]);
+  const deleteTemperatureLog = useCallback((id: string) => makeApiRequest<null, void>('DELETE', 'temperature-logs', undefined, 'Temperature Log', '', id), [makeApiRequest]);
 
   // Cleaning Task Definition functions
-  const addCleaningTaskDefinition = (data: Omit<CleaningTask, 'id'>) => makeApiRequest<CleaningTask, Omit<CleaningTask, 'id'>>('POST', 'cleaning-tasks', data, 'Cleaning Task Definition', 'Added');
-  const updateCleaningTaskDefinition = (data: CleaningTask) => makeApiRequest<CleaningTask, CleaningTask>('PUT', 'cleaning-tasks', data, 'Cleaning Task Definition', 'Updated', data.id);
-  const deleteCleaningTaskDefinition = (id: string) => makeApiRequest<null, void>('DELETE', 'cleaning-tasks', undefined, 'Cleaning Task Definition', '', id).then(() => {
+  const addCleaningTaskDefinition = useCallback((data: Omit<CleaningTask, 'id'>) => makeApiRequest<CleaningTask, Omit<CleaningTask, 'id'>>('POST', 'cleaning-tasks', data, 'Cleaning Task Definition', 'Added'), [makeApiRequest]);
+  const updateCleaningTaskDefinition = useCallback((data: CleaningTask) => makeApiRequest<CleaningTask, CleaningTask>('PUT', 'cleaning-tasks', data, 'Cleaning Task Definition', 'Updated', data.id), [makeApiRequest]);
+  const deleteCleaningTaskDefinition = useCallback((id: string) => makeApiRequest<null, void>('DELETE', 'cleaning-tasks', undefined, 'Cleaning Task Definition', '', id).then(() => {
     // Also remove related checklist items on the client if not handled by backend cascade (which it isn't for mock)
     setCleaningChecklistItems(prev => (prev || []).filter(item => item.taskId !== id));
     fetchData();
-  });
+  }), [makeApiRequest, fetchData]);
   
   // Cleaning Checklist Item functions
-  const updateCleaningChecklistItem = (data: CleaningChecklistItem) => makeApiRequest<CleaningChecklistItem, CleaningChecklistItem>('PUT', 'cleaning-checklist-items', data, 'Cleaning Checklist Item', 'Updated', data.id);
+  const updateCleaningChecklistItem = useCallback((data: CleaningChecklistItem) => makeApiRequest<CleaningChecklistItem, CleaningChecklistItem>('PUT', 'cleaning-checklist-items', data, 'Cleaning Checklist Item', 'Updated', data.id), [makeApiRequest]);
   
   // User functions
-  const addUser = (data: Omit<User, 'id'>) => makeApiRequest<User, Omit<User, 'id'>>('POST', 'users', data, 'User', 'Added');
-  const updateUser = (data: User) => makeApiRequest<User, User>('PUT', 'users', data, 'User', 'Updated', data.id);
-  const deleteUser = (id: string) => makeApiRequest<null, void>('DELETE', 'users', undefined, 'User', '', id);
+  const addUser = useCallback((data: Omit<User, 'id'>) => makeApiRequest<User, Omit<User, 'id'>>('POST', 'users', data, 'User', 'Added'), [makeApiRequest]);
+  const updateUser = useCallback((data: User) => makeApiRequest<User, User>('PUT', 'users', data, 'User', 'Updated', data.id), [makeApiRequest]);
+  const deleteUser = useCallback((id: string) => makeApiRequest<null, void>('DELETE', 'users', undefined, 'User', '', id), [makeApiRequest]);
 
   const getRecentActivities = useCallback((limit: number = 5): ActivityFeedItem[] => {
     const activities: ActivityFeedItem[] = [];

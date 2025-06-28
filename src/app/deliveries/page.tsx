@@ -29,6 +29,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { useData } from "@/context/DataContext";
 import { useToast } from "@/hooks/use-toast";
+import { safeLength, safeMap, safeFilter, safeFind, ensureArray } from '@/lib/array-utils';
 
 const NO_USER_VALUE = "__NONE__";
 
@@ -104,7 +105,7 @@ export default function DeliveriesPage() {
     setEditingLog(log);
     reset({
       supplierId: log.supplierId,
-      items: log.items.map(item => ({...item})), 
+      items: safeMap(log.items, item => ({...item})), 
       isCompliant: log.isCompliant,
       vehicleReg: log.vehicleReg || "",
       driverName: log.driverName || "",
@@ -137,7 +138,7 @@ export default function DeliveriesPage() {
     toast({ title: "Delivery Log Deleted", variant: "destructive" });
   };
   
-  const getSupplierName = (supplierId: string) => suppliers.find(s => s.id === supplierId)?.name || 'Unknown Supplier';
+  const getSupplierName = (supplierId: string) => safeFind(suppliers, s => s.id === supplierId)?.name || 'Unknown Supplier';
   
   const getUserNameForDisplay = (userId?: string) => {
     if (!userId || userId === NO_USER_VALUE) return 'N/A';
@@ -176,7 +177,7 @@ export default function DeliveriesPage() {
                         <SelectValue placeholder="Select supplier" />
                       </SelectTrigger>
                       <SelectContent>
-                        {suppliers.map(supplier => (
+                        {safeMap(suppliers, supplier => (
                           <SelectItem key={supplier.id} value={supplier.id}>{supplier.name}</SelectItem>
                         ))}
                       </SelectContent>
@@ -243,7 +244,7 @@ export default function DeliveriesPage() {
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value={NO_USER_VALUE}>N/A (No Verifier)</SelectItem>
-                        {users.map(user => (
+                        {safeMap(users, user => (
                           <SelectItem key={user.id} value={user.id}>{user.name}</SelectItem>
                         ))}
                       </SelectContent>
@@ -277,16 +278,16 @@ export default function DeliveriesPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                 {deliveryLogs.length === 0 && (
+                 {safeLength(deliveryLogs) === 0 && (
                   <TableRow>
                     <TableCell colSpan={6} className="text-center">No deliveries logged yet.</TableCell>
                   </TableRow>
                 )}
-                {deliveryLogs.map((log) => (
+                {safeMap(deliveryLogs, (log) => (
                   <TableRow key={log.id} className={!log.isCompliant ? "bg-destructive/10" : ""}>
                     <TableCell>{format(parseISO(log.deliveryTime), "PPpp", { locale: enUS })}</TableCell>
                     <TableCell>{getSupplierName(log.supplierId)}</TableCell>
-                    <TableCell>{log.items.length} item(s)</TableCell>
+                    <TableCell>{safeLength(log.items)} item(s)</TableCell>
                     <TableCell>
                       <Badge variant={log.isCompliant ? "default" : "destructive"} className={log.isCompliant ? "bg-accent text-accent-foreground hover:bg-accent/80" : ""}>
                         {log.isCompliant ? "Compliant" : "Non-Compliant"}

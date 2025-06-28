@@ -28,6 +28,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { useData } from '@/context/DataContext';
 import { useToast } from "@/hooks/use-toast";
+import { safeLength, safeMap, safeFilter, ensureArray } from '@/lib/array-utils';
 
 const NO_USER_VALUE = "__NONE__";
 
@@ -164,7 +165,7 @@ export default function TemperaturesPage() {
             <CardDescription>Select an appliance to record its current temperature reading.</CardDescription>
           </CardHeader>
           <CardContent className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
-            {appliances.map((appliance) => (
+            {safeMap(appliances, (appliance) => (
               <Button
                 key={appliance.id}
                 variant="outline"
@@ -176,7 +177,7 @@ export default function TemperaturesPage() {
                 <span className="text-xs text-muted-foreground">{appliance.location} ({appliance.type})</span>
               </Button>
             ))}
-             {appliances.length === 0 && <p className="col-span-full text-center text-muted-foreground">No appliances configured. Please add appliances in Settings.</p>}
+             {safeLength(appliances) === 0 && <p className="col-span-full text-center text-muted-foreground">No appliances configured. Please add appliances in Settings.</p>}
           </CardContent>
         </Card>
 
@@ -241,7 +242,7 @@ export default function TemperaturesPage() {
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value={NO_USER_VALUE}>N/A (No Logger)</SelectItem>
-                        {users.map(user => (
+                        {safeMap(users, user => (
                           <SelectItem key={user.id} value={user.id}>{user.name}</SelectItem>
                         ))}
                       </SelectContent>
@@ -275,12 +276,12 @@ export default function TemperaturesPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {temperatureLogs.length === 0 && (
+                {safeLength(temperatureLogs) === 0 && (
                   <TableRow>
                     <TableCell colSpan={7} className="text-center">No temperature logs yet.</TableCell>
                   </TableRow>
                 )}
-                {temperatureLogs.map((log) => (
+                {safeMap(temperatureLogs, (log) => (
                   <TableRow key={log.id} className={!log.isCompliant ? "bg-destructive/10" : ""}>
                     <TableCell className="font-medium">{getApplianceName(log.applianceId)}</TableCell>
                     <TableCell>{log.temperature.toFixed(1)}</TableCell>

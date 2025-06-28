@@ -29,6 +29,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { useData } from '@/context/DataContext';
 import { useToast } from "@/hooks/use-toast";
+import { safeLength, safeMap, safeFilter, safeFind, ensureArray } from '@/lib/array-utils';
 
 const NO_USER_VALUE = "__NONE__";
 
@@ -115,7 +116,7 @@ export default function ProductionPage() {
   };
   
   const handleDelete = (id: string) => {
-    const logToDelete = productionLogs.find(log => log.id === id);
+    const logToDelete = safeFind(productionLogs, log => log.id === id);
     deleteLogFromContext(id);
     if (logToDelete) {
       toast({ title: "Log Deleted", description: `${logToDelete.productName} log has been removed.`, variant: "destructive" });
@@ -213,7 +214,7 @@ export default function ProductionPage() {
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value={NO_USER_VALUE}>N/A (No Verifier)</SelectItem>
-                        {users.map(user => (
+                        {safeMap(users, user => (
                           <SelectItem key={user.id} value={user.id}>{user.name}</SelectItem>
                         ))}
                       </SelectContent>
@@ -248,12 +249,12 @@ export default function ProductionPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {productionLogs.length === 0 && (
+                {safeLength(productionLogs) === 0 && (
                   <TableRow>
                     <TableCell colSpan={8} className="text-center">No production logs yet.</TableCell>
                   </TableRow>
                 )}
-                {productionLogs.map((log) => {
+                {safeMap(productionLogs, (log) => {
                   const verifierName = getVerifierNameForDisplay(log.verifiedBy);
                   return (
                     <TableRow key={log.id} className={!log.isCompliant ? "bg-destructive/10" : ""}>
